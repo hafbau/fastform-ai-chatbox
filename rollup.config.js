@@ -66,7 +66,7 @@ const bundle = () => ({
         sync: true,
         cwd: "dist",
       },
-      ["plugin.min.js", "schema.json"]
+      ["plugin.min.js", "schema.json", "package.json"]
     )
   },
 })
