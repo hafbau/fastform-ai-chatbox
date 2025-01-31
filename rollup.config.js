@@ -12,6 +12,7 @@ import fs from "fs"
 import pkg from "./package.json"
 import crypto from "crypto"
 import { validate } from "@budibase/backend-core/plugins"
+import typescript from "@rollup/plugin-typescript"
 
 const ignoredWarnings = [
   "unused-export-let",
@@ -50,7 +51,6 @@ const hash = () => ({
     const newSchema = {
       ...schema,
       hash: hex,
-      version: pkg.version,
     }
     fs.writeFileSync("./dist/schema.json", JSON.stringify(newSchema, null, 2))
   },
@@ -58,23 +58,25 @@ const hash = () => ({
 
 // Custom plugin to bundle up our files after building
 const bundle = () => ({
-  async writeBundle() {
-    const bundleName = `${pkg.name}-${pkg.version}.tar.gz`
-    return tar
-        .c({ gzip: true, cwd: "dist" }, [
-          "plugin.min.js",
-          "schema.json",
-          "package.json",
-        ])
-        .pipe(fs.createWriteStream(`dist/${bundleName}`))
+  writeBundle() {
+    return tar.c(
+      {
+        gzip: true,
+        file: `dist/${pkg.name}.tar.gz`,
+        sync: true,
+        cwd: "dist",
+      },
+      ["plugin.min.js", "schema.json"]
+    )
   },
 })
 
+// Validate schema before building
 const validateSchema = () => ({
   buildStart() {
     const schema = fs.readFileSync("schema.json", "utf8")
     validate(JSON.parse(schema))
-  }
+  },
 })
 
 export default {
@@ -102,6 +104,7 @@ export default {
         }
       },
     }),
+    typescript(),
     postcss(),
     commonjs(),
     nodePolyfills(),
@@ -109,6 +112,7 @@ export default {
       preferBuiltins: true,
       browser: true,
       skip: ["svelte", "svelte/internal"],
+      extensions: [".js", ".ts"],
     }),
     svg(),
     json(),

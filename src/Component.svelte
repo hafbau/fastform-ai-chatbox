@@ -1,122 +1,86 @@
 <script>
+  import { onMount, onDestroy } from "svelte"
   import { getContext } from "svelte"
-  import { onMount } from 'svelte'
-  import { loadStripe } from '@stripe/stripe-js'
-  import { Elements, CardNumber, CardCvc, CardExpiry } from 'svelte-stripe'
+  import chatWidget from "./chat-widget/src/index"
 
+  // Props from schema.json settings
+  export let url = ""
+  export let widgetTitle = "Chatbot"
+  export let greetingMessage = "Hello! How can I help you today?"
+  export let responseIsAStream = false
+  export let disableErrorAlert = false
+  export let closeOnOutsideClick = true
+  export let openOnLoad = false
 
-  export let PUBLIC_STRIPE_KEY
-  export let theme
-  export let labels
-
-  export let rules
-  export let elementOptions
-  export let elementsOptions
-  export let variables
-  export let onSubmit
-
+  // Get SDK context
   const { styleable, Provider } = getContext("sdk")
   const component = getContext("component")
-  let stripe = null
-  let elements
-  let element
-  let name
 
+  // State for chat widget
+  let chatButton
+  let isInitialized = false
+
+  // Initialize chat widget
   onMount(async () => {
-    stripe = await loadStripe(PUBLIC_STRIPE_KEY)
+    // Configure the widget
+    chatWidget.config.url = url
+    chatWidget.config.widgetTitle = widgetTitle
+    chatWidget.config.greetingMessage = greetingMessage
+    chatWidget.config.responseIsAStream = responseIsAStream
+    chatWidget.config.disableErrorAlert = disableErrorAlert
+    chatWidget.config.closeOnOutsideClick = closeOnOutsideClick
+    chatWidget.config.openOnLoad = openOnLoad
+
+    // Initialize the widget
+    await chatWidget.init()
+    isInitialized = true
   })
 
-  function tryParse(value) {
-    try {
-      return JSON.parse(value)
-    } catch (e) {
-      console.error(e)
-      return {}
+  // Cleanup on component destroy
+  onDestroy(() => {
+    if (isInitialized) {
+      chatWidget.close()
     }
-  }
+  })
 
-  $: rules = tryParse(rules)
-  $: elementOptions = tryParse(elementOptions)
-  $: elementsOptions = tryParse(elementsOptions)
-  $: variables = tryParse(variables)
-
-  $: error = ''
-  $: dataContext =  {
-    __stripe: stripe,
-    __elements: elements,
-    __token: "",
-    processing: false,
-    __error: error
-  }
-
-  async function submit() {
-    try {
-      dataContext.processing = true
-      const {token, error} = await stripe.createToken(element, { name });
-      dataContext.processing = false
-      if (token) {
-        dataContext.__token = token
-        onSubmit?.({token})
-      } else throw error
-    } catch (e) {
-      dataContext.processing = false
-      console.error(e);
-      error = e?.message ?? e
+  // Handle button click
+  function handleClick() {
+    if (isInitialized) {
+      chatWidget.open({ target: chatButton })
     }
   }
 </script>
 
-
 <div use:styleable={$component.styles}>
-  {#if error}
-    <p class="error">{error} Please try again.</p>
-  {/if}
-  <Provider data={dataContext}>
-    <Elements
-      mode="setup"
-      currency="usd"
-      {...elementsOptions}
-      {stripe}
-      {theme}
-      {labels}
-      {variables}
-      {rules}
-      bind:elements
-    >
-      <CardNumber bind:element={element} classes={{ base: 'stripe-elements-input' }} {...elementOptions}/>
-
-      <div class="row">
-        <CardExpiry classes={{ base: 'stripe-elements-input' }} {...elementOptions}/>
-        <CardCvc classes={{ base: 'stripe-elements-input' }} {...elementOptions}/>
-      </div>
-      <div on:click|preventDefault={submit} on:keyup={submit}>
-        <slot />
-      </div>
-    </Elements>
-  </Provider>
+  <button
+    bind:this={chatButton}
+    data-buildship-chat-widget-button
+    on:click={handleClick}
+    class="chat-button"
+  >
+    <slot>Chat with AI</slot>
+  </button>
 </div>
 
 <style>
-  .error {
-    color: tomato;
-    margin: 2rem 0 0;
+  .chat-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 25px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
   }
 
-  .row {
-    display: flex;
-    flex-direction: row;
-    gap: 5px;
-  }
-
-  :global(.stripe-elements-input) {
-    border: solid 1px #cacaca;
-    padding: 1em;
-    border-radius: 5px;
-    background: white;
-    margin-bottom: 1.5em;
-  }
-
-  .row :global(.stripe-elements-input) {
-    width: 30%;
+  .chat-button:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
   }
 </style>

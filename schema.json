@@ -2,126 +2,64 @@
   "type": "component",
   "metadata": {},
   "schema": {
-    "name": "bb-stripe-elements",
-    "friendlyName": "Stripe Elements",
-    "description": "A Stripe Elements component for Fastform",
-    "icon": "CreditCard",
-    "hasChildren": true,
+    "name": "ff-ai-chatbox",
+    "friendlyName": "AI Chatbox",
+    "description": "An AI-powered chat widget for Fastform",
+    "icon": "MessageCircle",
+    "hasChildren": false,
     "showEmptyState": false,
     "settings": [
       {
         "type": "text",
-        "key": "PUBLIC_STRIPE_KEY",
-        "label": "Public Stripe Key",
+        "key": "url",
+        "label": "Chat API URL",
         "required": true
       },
       {
-        "type": "event",
-        "label": "On Submit",
-        "key": "onSubmit",
-        "context": [
-          {
-            "label": "Token",
-            "key": "token"
-          },
-          {
-            "label": "Elements",
-            "key": "__element"
-          },
-          {
-            "label": "Stripe",
-            "key": "__stripe"
-          },
-          {
-            "label": "Processing",
-            "key": "processing"
-          }
-        ]
-      },
-      {
-        "type":"select",
-        "key":"elementType",
-        "label":"Element Type",
-        "options": ["payment", "address", "card"],
-        "defaultValue": "payment"
+        "type": "text",
+        "key": "widgetTitle",
+        "label": "Widget Title",
+        "defaultValue": "Chatbot"
       },
       {
         "type": "text",
-        "key": "elementsOptions",
-        "label": "JSON of Stripe Elements Options",
-        "defaultValue": "{}"
+        "key": "greetingMessage",
+        "label": "Greeting Message",
+        "defaultValue": "Hello! How can I help you today?"
       },
       {
-        "type": "text",
-        "key": "elementOptions",
-        "label": "JSON of Stripe Element Options",
-        "defaultValue": "{}"
+        "type": "boolean",
+        "key": "responseIsAStream",
+        "label": "Response is Streamed",
+        "defaultValue": false
       },
       {
-        "type": "section",
-        "section": true,
-        "label": "Appearance",
-        "settings": [
-          {
-            "type": "select",
-            "key": "theme",
-            "label": "Elements Theme",
-            "options": ["stripe", "night", "flat"],
-            "defaultValue": "stripe"
-          },
-          {
-            "type": "select",
-            "key": "labels",
-            "label": "Elements Labels Configuration",
-            "options": ["above", "floating"],
-            "defaultValue": "above"
-          },
-          {
-            "type": "boolean",
-            "key": "disableAnimations",
-            "label": "Disable Animations",
-            "defaultValue": false
-          },
-          {
-            "type": "text",
-            "key": "variables",
-            "label": "JSON of Stripe Appearance Variables",
-            "defaultValue": "{}"
-          },
-          {
-            "type": "text",
-            "key": "rules",
-            "label": "JSON of Stripe Appearance Rules",
-            "defaultValue": "{}"
-          }
-        ]
+        "type": "boolean",
+        "key": "disableErrorAlert",
+        "label": "Disable Error Alerts",
+        "defaultValue": false
+      },
+      {
+        "type": "boolean",
+        "key": "closeOnOutsideClick",
+        "label": "Close on Outside Click",
+        "defaultValue": true
+      },
+      {
+        "type": "boolean",
+        "key": "openOnLoad",
+        "label": "Open on Page Load",
+        "defaultValue": false
       }
     ],
     "context": [
       {
-        "type": "static",
-        "values": [
-          {
-            "label": "Stripe Token",
-            "key": "__token",
-            "type": "string"
-          },
-          {
-            "label": "Error",
-            "key": "__error",
-            "type": "string"
-          },
-          {
-            "label": "Stripe",
-            "key": "__stripe",
-            "type": "object"
-          },
-          {
-            "label": "Elements",
-            "key": "__elements",
-            "type": "object"
-          }
-        ]
+        "label": "Thread ID",
+        "key": "threadId"
+      },
+      {
+        "label": "User Data",
+        "key": "user"
       }
     ]
   }
