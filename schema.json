@@ -4,8 +4,9 @@
   "schema": {
     "name": "ff-ai-chatbox",
     "friendlyName": "AI Chatbox",
-    "description": "An AI-powered chat widget for Fastform",
+    "description": "Add an AI chatbox to your website",
     "icon": "MagicWand",
+    "category": "AI",
     "hasChildren": false,
     "showEmptyState": false,
     "settings": [
@@ -19,13 +20,130 @@
         "type": "text",
         "key": "widgetTitle",
         "label": "Widget Title",
-        "defaultValue": "Ask Neil"
+        "defaultValue": "Chat"
       },
       {
         "type": "text",
         "key": "greetingMessage",
         "label": "Greeting Message",
         "defaultValue": "Hello! How can I help you today?"
+      },
+      {
+        "type": "select",
+        "key": "mode",
+        "label": "Display Mode",
+        "defaultValue": "fullscreen",
+        "options": [
+          {
+            "label": "Fullscreen (fills container)",
+            "value": "fullscreen"
+          },
+          {
+            "label": "Widget (with toggle button)",
+            "value": "widget"
+          }
+        ]
+      },
+      {
+        "type": "select",
+        "key": "buttonPosition",
+        "label": "Button Position",
+        "defaultValue": "bottom-right",
+        "options": [
+          {
+            "label": "Top Left",
+            "value": "top-left"
+          },
+          {
+            "label": "Top Right",
+            "value": "top-right"
+          },
+          {
+            "label": "Bottom Left",
+            "value": "bottom-left"
+          },
+          {
+            "label": "Bottom Right",
+            "value": "bottom-right"
+          },
+          {
+            "label": "Custom",
+            "value": "custom"
+          }
+        ],
+        "showIf": {
+          "mode": "widget"
+        }
+      },
+      {
+        "type": "select",
+        "key": "widgetPosition",
+        "label": "Widget Position",
+        "defaultValue": "right",
+        "options": [
+          {
+            "label": "Top",
+            "value": "top"
+          },
+          {
+            "label": "Right",
+            "value": "right"
+          },
+          {
+            "label": "Bottom",
+            "value": "bottom"
+          },
+          {
+            "label": "Left",
+            "value": "left"
+          },
+          {
+            "label": "Custom",
+            "value": "custom"
+          }
+        ],
+        "showIf": {
+          "mode": "widget"
+        }
+      },
+      {
+        "type": "boolean",
+        "key": "buttonFixed",
+        "label": "Fixed Button Position",
+        "defaultValue": true,
+        "description": "Button stays fixed when scrolling",
+        "showIf": {
+          "mode": "widget"
+        }
+      },
+      {
+        "type": "boolean",
+        "key": "widgetFixed",
+        "label": "Fixed Widget Position",
+        "defaultValue": true,
+        "description": "Widget stays fixed when scrolling",
+        "showIf": {
+          "mode": "widget"
+        }
+      },
+      {
+        "type": "boolean",
+        "key": "showBackdrop",
+        "label": "Show Backdrop",
+        "defaultValue": true,
+        "description": "Show a backdrop behind the widget when open",
+        "showIf": {
+          "mode": "widget"
+        }
+      },
+      {
+        "type": "boolean",
+        "key": "openOnLoad",
+        "label": "Open on Page Load",
+        "defaultValue": false,
+        "showIf": {
+          "mode": "widget"
+        }
       },
       {
         "type": "boolean",
@@ -38,46 +156,21 @@
         "key": "disableErrorAlert",
         "label": "Disable Error Alerts",
         "defaultValue": false
+      }
+    ],
+    "styles": [
+      {
+        "selector": ".chat-button",
+        "label": "Chat Button",
+        "properties": ["background", "border", "spacing", "typography", "size", "effects", "layout"],
+        "showIf": {
+          "mode": "widget"
+        }
       },
       {
-        "type": "boolean",
-        "key": "closeOnOutsideClick",
-        "label": "Close on Outside Click",
-        "defaultValue": true
-      },
-      {
-        "type": "boolean",
-        "key": "openOnLoad",
-        "label": "Open on Page Load",
-        "defaultValue": false
-      },
-      {
-        "type": "boolean",
-        "key": "isPopover",
-        "label": "Show as Popover",
-        "defaultValue": true,
-        "description": "Show chat widget as a popover instead of modal"
-      },
-      {
-        "type": "boolean",
-        "key": "inPage",
-        "label": "In-Page Mode",
-        "defaultValue": false,
-        "description": "Expand widget within its container instead of showing as modal/popover"
-      },
-      {
-        "type": "boolean",
-        "key": "enableAudioInput",
-        "label": "Enable Voice Input",
-        "defaultValue": true,
-        "description": "Allow users to record voice messages"
-      },
-      {
-        "type": "boolean",
-        "key": "autoSendAudioMessage",
-        "label": "Auto-send Voice Messages",
-        "defaultValue": true,
-        "description": "Automatically send message when voice recording stops"
+        "selector": ".chat-widget",
+        "label": "Chat Widget",
+        "properties": ["background", "border", "spacing", "size", "effects", "layout"]
       }
     ],
     "context": [
@@ -87,9 +180,9 @@
         "label": "Thread ID"
       },
       {
-        "type": "object",
+        "type": "text",
         "key": "user",
-        "label": "User Data"
+        "label": "User ID"
       }
     ]
   }

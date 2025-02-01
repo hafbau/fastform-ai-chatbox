@@ -1,14 +1,40 @@
-export type WidgetConfig = {
+export type DisplayMode = 'fullscreen' | 'widget'
+export type ButtonPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'custom'
+export type WidgetPosition = 'top' | 'right' | 'bottom' | 'left' | 'custom'
+
+export interface WidgetConfig {
   url: string
-  threadId: string | null
-  user: Record<string, any> | null
-  responseIsAStream: boolean
-  widgetTitle: string
-  greetingMessage: string | null
-  disableErrorAlert: boolean
-  closeOnOutsideClick: boolean
-  openOnLoad: boolean
-  showAs: 'modal' | 'popover' | 'inline'
-  enableAudioInput: boolean
-  autoSendAudioMessage: boolean
+  threadId?: string | null
+  user?: string | null
+  title?: string
+  mode?: DisplayMode
+  
+  // Widget mode specific options
+  buttonPosition?: ButtonPosition
+  widgetPosition?: WidgetPosition
+  buttonFixed?: boolean
+  widgetFixed?: boolean
+  openOnLoad?: boolean
+  showBackdrop?: boolean
+  
+  // Custom positioning (when position is 'custom')
+  buttonStyle?: {
+    top?: string
+    right?: string
+    bottom?: string
+    left?: string
+  }
+  widgetStyle?: {
+    top?: string
+    right?: string
+    bottom?: string
+    left?: string
+    width?: string
+    height?: string
+  }
+
+  // Common options
+  responseIsAStream?: boolean
+  disableErrorAlert?: boolean
+  greetingMessage?: string | null
 }

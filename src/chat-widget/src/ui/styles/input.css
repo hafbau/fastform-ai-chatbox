@@ -1,0 +1,95 @@
+.buildship-chat-widget__input-area {
+  padding: 1rem;
+  background-color: var(--buildship-chat-widget-bg-color);
+  border-top: 1px solid var(--buildship-chat-widget-border-color);
+}
+
+.buildship-chat-widget__form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.buildship-chat-widget__input-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  width: 100%;
+  background-color: var(--buildship-chat-widget-bg-color);
+  border: 1px solid var(--buildship-chat-widget-border-color);
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  transition: border-color 0.2s ease-in-out;
+}
+
+.buildship-chat-widget__input-container:focus-within {
+  border-color: var(--buildship-chat-widget-primary-color);
+}
+
+.buildship-chat-widget__input {
+  flex: 1;
+  border: none;
+  padding: 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  background: none;
+  color: var(--buildship-chat-widget-text-color);
+  resize: none;
+  max-height: 150px;
+  min-height: 24px;
+  width: 100%;
+  overflow-y: auto;
+}
+
+.buildship-chat-widget__input:focus {
+  outline: none;
+}
+
+.buildship-chat-widget__input::placeholder {
+  color: #9CA3AF;
+}
+
+.buildship-chat-widget__mic,
+.buildship-chat-widget__submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border: none;
+  background: none;
+  color: var(--buildship-chat-widget-text-color);
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: var(--buildship-chat-widget-button-transition);
+  flex-shrink: 0;
+}
+
+.buildship-chat-widget__mic:hover,
+.buildship-chat-widget__submit:hover {
+  background-color: var(--buildship-chat-widget-hover-color);
+}
+
+.buildship-chat-widget__mic.recording {
+  color: var(--buildship-chat-widget-primary-color);
+  animation: pulse 2s infinite;
+}
+
+.buildship-chat-widget__submit {
+  color: var(--buildship-chat-widget-primary-color);
+}
+
+.buildship-chat-widget__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

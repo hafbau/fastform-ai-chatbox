@@ -1,100 +1,106 @@
-import { UIManager } from "./modules/uiManager"
-import { MessageHandler } from "./modules/messageHandler"
-import { SpeechRecognitionManager } from "./modules/speechRecognition"
-import { WidgetConfig } from "./types/config"
-import "./widget.css"
+import { WidgetConfig } from './types/config'
+import { Widget } from './components/Widget'
+import { MessageService } from './services/MessageService'
+import { SpeechService } from './services/SpeechService'
+import { DEFAULT_CONFIG } from './constants/settings'
 
-class ChatWidget {
+// Import styles
+import './ui/styles/base.css'
+import './ui/styles/messages.css'
+import './ui/styles/input.css'
+
+export class ChatWidget {
   private config: WidgetConfig
-  private uiManager: UIManager
-  private messageHandler: MessageHandler
-  private speechRecognition: SpeechRecognitionManager
-  private initialized: boolean = false
-  private initPromise: Promise<void> | null = null
+  private widget: Widget
+  private messageService: MessageService
+  private speechService: SpeechService
+  private isInitialized: boolean = false
 
   constructor(config: Partial<WidgetConfig>) {
-    // Set default config values
-    this.config = {
-      url: "",
-      threadId: null,
-      responseIsAStream: false,
-      user: null,
-      widgetTitle: "Chat",
-      greetingMessage: null,
-      disableErrorAlert: false,
-      closeOnOutsideClick: true,
-      openOnLoad: false,
-      showAs: 'modal',
-      enableAudioInput: true,
-      autoSendAudioMessage: false,
-      ...config
-    }
+    console.log('ChatWidget constructor:', config)
+    // Merge provided config with defaults
+    this.config = { ...DEFAULT_CONFIG, ...config } as WidgetConfig
 
-    // Initialize managers
-    this.uiManager = new UIManager(this.config)
-    this.messageHandler = new MessageHandler(this.config, this.uiManager)
-    this.speechRecognition = new SpeechRecognitionManager(this.config)
+    // Initialize widget with event handlers
+    this.widget = new Widget(this.config, {
+      onSubmit: (message) => this.handleSubmit(message),
+      onClose: () => this.hide(),
+      onMicClick: (event) => this.handleMicClick(event)
+    })
+
+    // Initialize services
+    this.messageService = new MessageService(this.config, this.widget)
+    this.speechService = new SpeechService(this.widget, (text) => this.handleSpeechResult(text))
   }
 
-  private async ensureInitialized() {
-    if (this.initialized) return
+  private handleSubmit(message: string): void {
+    console.log('Submitting message:', message)
+    this.messageService.sendMessage(message)
+  }
 
-    // If initialization is already in progress, wait for it
-    if (this.initPromise) {
-      await this.initPromise
+  private handleMicClick(event: Event): void {
+    console.log('Mic clicked:', event)
+    event.preventDefault()
+    if (this.speechService.isSupported()) {
+      this.speechService.toggleRecording()
+    } else {
+      console.warn('Speech recognition is not supported in this browser')
+    }
+  }
+
+  private handleSpeechResult(text: string): void {
+    console.log('Speech result:', text)
+    if (text.trim()) {
+      this.messageService.sendMessage(text)
+    }
+  }
+
+  public mount(container?: HTMLElement): void {
+    console.log('ChatWidget mount:', container)
+    if (this.isInitialized) {
+      console.warn('Chat widget is already initialized')
       return
     }
 
-    // Start initialization
-    this.initPromise = this.init()
-    await this.initPromise
+    const targetContainer = container || document.body
+    targetContainer.appendChild(this.widget.getElement())
+    this.isInitialized = true
   }
 
-  public async init() {
-    if (this.initialized) return
-    
-    // Setup event handlers
-    this.setupEventHandlers()
-    
-    this.initialized = true
-
-    // Open widget if configured to do so
-    if (this.config.openOnLoad) {
-      // Use a dummy event since we don't have a trigger element
-      this.uiManager.open({ target: document.body })
+  public show(): void {
+    console.log('ChatWidget show')
+    if (!this.isInitialized) {
+      console.warn('Chat widget is not initialized. Call mount() first.')
+      return
     }
+    this.widget.show()
   }
 
-  private setupEventHandlers() {
-    const form = document.querySelector('#buildship-chat-widget__form')
-    const micButton = document.querySelector('#buildship-chat-widget__mic')
-    const widget = document.querySelector('#buildship-chat-widget')
-
-    if (form) {
-      form.addEventListener('submit', (e) => this.messageHandler.handleSubmit(e))
-    }
-
-    if (micButton && widget) {
-      micButton.addEventListener('click', (e) => {
-        this.speechRecognition.toggleRecording(e, widget as HTMLElement)
-      })
-    }
+  public hide(): void {
+    console.log('ChatWidget hide')
+    this.widget.hide()
   }
 
-  public async open(event: { target: HTMLElement }) {
-    await this.ensureInitialized()
-    this.uiManager.open(event)
+  public clear(): void {
+    console.log('ChatWidget clear')
+    this.messageService.clearMessages()
   }
 
-  public async close() {
-    await this.ensureInitialized()
-    this.uiManager.close()
+  public destroy(): void {
+    console.log('ChatWidget destroy')
+    if (!this.isInitialized) return
+
+    const element = this.widget.getElement()
+    element.parentElement?.removeChild(element)
+    this.isInitialized = false
   }
 }
 
-// Create widget instance with global config
-const globalConfig = (window as any).buildShipChatWidget?.config || {}
-const chatWidget = new ChatWidget(globalConfig)
+// Export as global variable for non-module environments
+declare global {
+  interface Window {
+    ChatWidget: typeof ChatWidget
+  }
+}
 
-// Export the instance and class
-export { chatWidget as default, ChatWidget }
+window.ChatWidget = ChatWidget

@@ -1,102 +1,225 @@
 <script>
   import { onMount, onDestroy } from "svelte"
   import { getContext } from "svelte"
-  import chatWidget from "./chat-widget/src/index"
+  import { ChatWidget } from "./chat-widget/src/index"
 
-  // Props from schema.json settings
   export let url = ""
-  export let widgetTitle = "Ask Neil"
+  export let widgetTitle = "Chat"
   export let greetingMessage = "Hello! How can I help you today?"
   export let responseIsAStream = false
   export let disableErrorAlert = false
-  export let closeOnOutsideClick = true
+  export let mode = "fullscreen"
+  export let buttonPosition = "bottom-right"
+  export let widgetPosition = "right"
+  export let buttonFixed = true
+  export let widgetFixed = true
+  export let showBackdrop = true
   export let openOnLoad = false
-  export let isPopover = false
-  export let inPage = false
-  export let enableAudioInput = true
-  export let autoSendAudioMessage = true
 
-  // Get SDK context
-  const { styleable, Provider } = getContext("sdk")
+  const { styleable } = getContext("sdk")
   const component = getContext("component")
 
-  // State for chat widget
-  let chatButton
   let isInitialized = false
+  let chatWidget
+  let container
+  let buttonContainer
+  let mounted = false
+  let isOpen = false
 
-  // Initialize chat widget
+  // Helper to get button position styles
+  $: buttonStyles = buttonPosition === 'custom' ? {} : {
+    'top-left': { top: '20px', left: '20px' },
+    'top-right': { top: '20px', right: '20px' },
+    'bottom-left': { bottom: '20px', left: '20px' },
+    'bottom-right': { bottom: '20px', right: '20px' }
+  }[buttonPosition] || {}
+
+  // Helper to get widget position styles
+  $: widgetStyles = widgetPosition === 'custom' ? {} : {
+    'top': { top: '20px', left: '20px', right: '20px' },
+    'right': { top: '20px', right: '20px', bottom: '20px' },
+    'bottom': { bottom: '20px', left: '20px', right: '20px' },
+    'left': { top: '20px', left: '20px', bottom: '20px' }
+  }[widgetPosition] || {}
+
   onMount(async () => {
-    // Wait for button to be mounted
-    await new Promise(resolve => setTimeout(resolve, 0))
+    mounted = true
+    initWidget()
+  })
 
-    // Configure the widget
-    chatWidget.config.url = url
-    chatWidget.config.widgetTitle = widgetTitle
-    chatWidget.config.greetingMessage = greetingMessage
-    chatWidget.config.responseIsAStream = responseIsAStream
-    chatWidget.config.disableErrorAlert = disableErrorAlert
-    chatWidget.config.closeOnOutsideClick = closeOnOutsideClick
-    chatWidget.config.openOnLoad = openOnLoad
-    chatWidget.config.isPopover = isPopover
-    chatWidget.config.inPage = inPage
-    chatWidget.config.enableAudioInput = enableAudioInput
-    chatWidget.config.autoSendAudioMessage = autoSendAudioMessage
+  function initWidget() {
+    const config = {
+      url,
+      title: widgetTitle,
+      greetingMessage,
+      responseIsAStream,
+      disableErrorAlert,
+      mode,
+      buttonPosition,
+      widgetPosition,
+      buttonFixed,
+      widgetFixed,
+      showBackdrop
+    }
 
-    // Initialize the widget
-    await chatWidget.init()
+    chatWidget = new ChatWidget(config)
+
+    if (mode === 'fullscreen') {
+      if (!container) {
+        console.error('Container element not found for fullscreen mode')
+        return
+      }
+      chatWidget.mount(container)
+      isOpen = true
+      chatWidget.show()
+    } else {
+      if (!buttonContainer) {
+        console.error('Button container element not found for widget mode')
+        return
+      }
+      chatWidget.mount(buttonContainer)
+      isOpen = openOnLoad
+      if (openOnLoad) {
+        chatWidget.show()
+      }
+    }
+
     isInitialized = true
+  }
 
-    // Open on load if configured
-    if (openOnLoad && chatButton) {
-      chatWidget.open({ target: chatButton })
-    }
-  })
-
-  // Cleanup on component destroy
   onDestroy(() => {
-    if (isInitialized) {
-      chatWidget.close()
+    if (isInitialized && chatWidget) {
+      chatWidget.destroy()
     }
   })
 
-  // Handle button click
-  function handleClick(e) {
-    if (isInitialized) {
-      chatWidget.open({ target: e.currentTarget })
+  function handleClick() {
+    if (isInitialized && chatWidget && mode === 'widget') {
+      isOpen = !isOpen
+      if (isOpen) {
+        chatWidget.show()
+      } else {
+        chatWidget.hide()
+      }
     }
+  }
+
+  $: if ($component && mounted) {
+    if (isInitialized && chatWidget) {
+      chatWidget.destroy()
+      isInitialized = false
+    }
+    initWidget()
   }
 </script>
 
-<div use:styleable={$component.styles}>
-  <button
-    bind:this={chatButton}
-    data-buildship-chat-widget-button
-    on:click={handleClick}
-    class="chat-button"
-  >
-    <slot>Ask Neil</slot>
-  </button>
-</div>
+{#if mode === 'fullscreen'}
+  <div class="chat-widget--fullscreen" bind:this={container} use:styleable={$component.styles} />
+{:else}
+  <div class="chat-widget-container" bind:this={buttonContainer}>
+    <button
+      class="chat-button"
+      class:chat-button--fixed={buttonFixed}
+      style={Object.entries(buttonStyles).map(([key, value]) => `${key}: ${value}`).join(';')}
+      on:click={handleClick}
+      aria-label="Toggle chat"
+      aria-expanded={isOpen}
+      use:styleable={$component.styles}
+    >
+      <slot>Chat</slot>
+    </button>
+
+    {#if showBackdrop && isOpen}
+      <button 
+        class="chat-backdrop"
+        class:chat-backdrop--fixed={widgetFixed}
+        on:click={() => handleClick()}
+        aria-label="Close chat"
+      />
+    {/if}
+
+    <div
+      class="chat-widget chat-widget--widget"
+      class:chat-widget--fixed={widgetFixed}
+      class:chat-widget--open={isOpen}
+      style={Object.entries(widgetStyles).map(([key, value]) => `${key}: ${value}`).join(';')}
+      role="dialog"
+      aria-modal={isOpen}
+      aria-hidden={!isOpen}
+      use:styleable={$component.styles}
+    />
+  </div>
+{/if}
 
 <style>
-  .chat-button {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 12px 24px;
-    border-radius: 25px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
+  .chat-widget--fullscreen {
+    height: 100%;
+    width: 100%;
   }
 
-  .chat-button:hover {
-    background-color: #0056b3;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  .chat-widget--widget {
+    position: absolute;
+    min-width: 320px;
+    min-height: 480px;
+    max-width: 90vw;
+    max-height: 90vh;
+    visibility: hidden;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.2s ease;
+  }
+
+  .chat-widget--fixed {
+    position: fixed;
+  }
+
+  .chat-widget--open {
+    visibility: visible;
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .chat-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 24px;
+    border-radius: 9999px;
+    background-color: #0066FF;
+    color: white;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .chat-button--fixed {
+    position: fixed;
+  }
+
+  .chat-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .chat-backdrop--fixed {
+    position: fixed;
+  }
+
+  .chat-widget--open ~ .chat-backdrop {
+    opacity: 1;
+    visibility: visible;
   }
 </style>
