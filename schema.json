@@ -50,6 +50,20 @@
         "key": "openOnLoad",
         "label": "Open on Page Load",
         "defaultValue": false
+      },
+      {
+        "type": "boolean",
+        "key": "isPopover",
+        "label": "Show as Popover",
+        "defaultValue": true,
+        "description": "Show chat widget as a popover instead of modal"
+      },
+      {
+        "type": "boolean",
+        "key": "inPage",
+        "label": "In-Page Mode",
+        "defaultValue": false,
+        "description": "Expand widget within its container instead of showing as modal/popover"
       }
     ],
     "context": [

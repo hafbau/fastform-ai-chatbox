@@ -21,6 +21,8 @@ export type WidgetConfig = {
   disableErrorAlert: boolean
   closeOnOutsideClick: boolean
   openOnLoad: boolean
+  isPopover: boolean
+  inPage: boolean
 }
 
 const renderer = new marked.Renderer()
@@ -41,6 +43,8 @@ const config: WidgetConfig = {
   disableErrorAlert: false,
   closeOnOutsideClick: true,
   openOnLoad: false,
+  isPopover: true,
+  inPage: false,
   ...(window as any).buildShipChatWidget?.config,
 }
 
@@ -92,13 +96,62 @@ const trap = createFocusTrap(containerElement, {
 })
 
 function open(e: Event) {
-  if (config.closeOnOutsideClick) {
+  const targetElement = e?.target as HTMLElement
+
+  if (config.inPage && targetElement) {
+    // For in-page mode, insert the widget after the button
+    targetElement.insertAdjacentElement('afterend', containerElement)
+  } else {
+    // For modal/popover mode, append to body
+    document.body.appendChild(containerElement)
+  }
+
+  if (config.closeOnOutsideClick && !config.isPopover && !config.inPage) {
     document.body.appendChild(optionalBackdrop)
   }
 
-  document.body.appendChild(containerElement)
   containerElement.innerHTML = widgetHTML
   containerElement.style.display = "block"
+  containerElement.setAttribute("data-popover", config.isPopover.toString())
+  containerElement.setAttribute("data-in-page", config.inPage.toString())
+
+  if (config.isPopover && !config.inPage && targetElement) {
+    const updatePosition = () => {
+      computePosition(targetElement, containerElement, {
+        placement: "bottom-end",
+        middleware: [
+          flip(),
+          shift({ padding: 16 })
+        ]
+      }).then(({ x, y }) => {
+        Object.assign(containerElement.style, {
+          left: `${x}px`,
+          top: `${y}px`,
+          position: 'absolute',
+          transform: 'none'
+        })
+      })
+    }
+
+    updatePosition()
+    cleanup = autoUpdate(
+      targetElement,
+      containerElement,
+      updatePosition
+    )
+  } else if (!config.inPage) {
+    // Reset styles for modal mode
+    Object.assign(containerElement.style, {
+      left: '50%',
+      top: '50%',
+      position: 'fixed',
+      transform: 'translate(-50%, -50%)'
+    })
+  }
+
+  if (config.greetingMessage) {
+    createNewMessageEntry(config.greetingMessage, Date.now(), "system")
+  }
 
   const chatbotHeaderTitleText = document.createElement("span")
   chatbotHeaderTitleText.id = "buildship-chat-widget__title_text"
@@ -110,25 +163,11 @@ function open(e: Event) {
 
   const chatbotBody = document.getElementById("buildship-chat-widget__body")!
   chatbotBody.prepend(messagesHistory)
-  if (config.greetingMessage && messagesHistory.children.length === 0) {
-    createNewMessageEntry(config.greetingMessage, Date.now(), "system")
-  }
-
-  const target = (e?.target as HTMLElement) || document.body
-  cleanup = autoUpdate(target, containerElement, () => {
-    computePosition(target, containerElement, {
-      placement: "top-start",
-      middleware: [flip(), shift({ crossAxis: true, padding: 8 })],
-      strategy: "fixed",
-    }).then(({ x, y }) => {
-      Object.assign(containerElement.style, {
-        left: `${x}px`,
-        top: `${y}px`,
-      })
-    })
-  })
 
   trap.activate()
+  const messageInput = document.getElementById(
+    "buildship-chat-widget__input"
+  ) as HTMLTextAreaElement
 
   if (config.closeOnOutsideClick) {
     document
@@ -317,18 +356,13 @@ async function submit(e: Event) {
   requestHeaders.append("Content-Type", "application/json")
 
   const data = {
-    ...config.user,
-    messages: [
-      {
-        role: "user",
-        content: (target.elements as any).message.value,
-      },
-    ],
+    message: (target.elements as any).message.value,
     threadId: config.threadId,
     timestamp: Date.now(),
+    ...config.user
   }
 
-  await createNewMessageEntry(data.messages[0].content, data.timestamp, "user")
+  await createNewMessageEntry(data.message, data.timestamp, "user")
   target.reset()
   messagesHistory.prepend(thinkingBubble)
 
@@ -339,6 +373,29 @@ async function submit(e: Event) {
       body: JSON.stringify(data),
     })
     thinkingBubble.remove()
+
+    if (!response.ok) {
+      let errorMessage = `Server error (${response.status})`
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.message || errorData.error || errorMessage
+      } catch (e) {
+        // If we can't parse the error response, use the status text
+        errorMessage = response.statusText || errorMessage
+      }
+      
+      console.error("BuildShip Chat Widget:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorMessage,
+        url: config.url
+      })
+
+      if (!config.disableErrorAlert) {
+        alert(`Could not send message: ${errorMessage}`)
+      }
+      return
+    }
 
     if (config.responseIsAStream) {
       await handleStreamedResponse(response)
