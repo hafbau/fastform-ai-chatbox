@@ -4,12 +4,7 @@ import { marked } from "marked"
 
 import { widgetHTML } from "./widgetHtmlString"
 import css from "./widget.css"
-
-const WIDGET_BACKDROP_ID = "buildship-chat-widget__backdrop"
-const WIDGET_CONTAINER_ID = "buildship-chat-widget__container"
-const WIDGET_MESSAGES_HISTORY_CONTAINER_ID =
-  "buildship-chat-widget__messages_history"
-const WIDGET_THINKING_BUBBLE_ID = "buildship-chat-widget__thinking_bubble"
+import { SpeechRecognition } from "./types/speech"
 
 export type WidgetConfig = {
   url: string
@@ -23,6 +18,8 @@ export type WidgetConfig = {
   openOnLoad: boolean
   isPopover: boolean
   inPage: boolean
+  enableAudioInput: boolean
+  autoSendAudioMessage: boolean
 }
 
 const renderer = new marked.Renderer()
@@ -38,52 +35,134 @@ const config: WidgetConfig = {
   threadId: null,
   responseIsAStream: false,
   user: {},
-  widgetTitle: "Chatbot",
+  widgetTitle: "Ask Neil",
   greetingMessage: null,
   disableErrorAlert: false,
   closeOnOutsideClick: true,
   openOnLoad: false,
-  isPopover: true,
+  isPopover: false,
   inPage: false,
+  enableAudioInput: true,
+  autoSendAudioMessage: true,
   ...(window as any).buildShipChatWidget?.config,
 }
 
 let cleanup = () => {}
 
+// Speech recognition setup
+let recognition: SpeechRecognition | null = null
+let isRecording = false
+
+if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  recognition = new SpeechRecognition()
+  recognition.continuous = false
+  recognition.interimResults = true
+  recognition.lang = 'en-US'
+}
+
+function toggleRecording(e: Event) {
+  e.preventDefault()
+  const micButton = e.currentTarget as HTMLButtonElement
+  const input = containerElement.querySelector('#buildship-chat-widget__input') as HTMLInputElement
+
+  if (!recognition) {
+    console.warn('Speech recognition is not supported in this browser')
+    return
+  }
+
+  if (!isRecording) {
+    // Start recording
+    isRecording = true
+    micButton.classList.add('recording')
+    recognition.start()
+
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map(result => result[0].transcript)
+        .join('')
+      
+      input.value = transcript
+    }
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error)
+      stopRecording(micButton)
+    }
+
+    recognition.onend = () => {
+      const wasRecording = isRecording
+      stopRecording(micButton)
+      
+      // If we were recording (not stopped manually) and auto-send is enabled
+      if (wasRecording && config.autoSendAudioMessage) {
+        const form = containerElement.querySelector('#buildship-chat-widget__form') as HTMLFormElement
+        if (form) {
+          const submitEvent = new Event('submit', { cancelable: true })
+          form.dispatchEvent(submitEvent)
+        }
+      }
+    }
+  } else {
+    // Stop recording
+    stopRecording(micButton)
+  }
+}
+
+function stopRecording(micButton: HTMLButtonElement) {
+  if (recognition && isRecording) {
+    recognition.stop()
+    isRecording = false
+    micButton.classList.remove('recording')
+  }
+}
+
 async function init() {
   const styleElement = document.createElement("style")
   styleElement.innerHTML = css
-
   document.head.insertBefore(styleElement, document.head.firstChild)
 
-  // Slight delay to allow DOMContent to be fully loaded
-  // (particularly for the button to be available in the `if (config.openOnLoad)` block below).
-  await new Promise(resolve => setTimeout(resolve, 500))
+  // Wait for DOM to be fully loaded
+  if (document.readyState === 'loading') {
+    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve))
+  }
 
-  document
-    .querySelector("[data-buildship-chat-widget-button]")
-    ?.addEventListener("click", open)
+  // Find the chat widget button
+  const chatButton = document.querySelector("[data-buildship-chat-widget-button]")
+  if (!chatButton) {
+    console.warn("BuildShip Chat Widget: Button not found. Make sure an element with [data-buildship-chat-widget-button] exists.")
+    return
+  }
 
+  // Add click handler
+  chatButton.addEventListener("click", open)
+
+  // Handle auto-open if configured
   if (config.openOnLoad) {
-    const target = document.querySelector("[data-buildship-chat-widget-button]")
     const event = new Event("click")
-    Object.defineProperty(event, "target", { value: target })
+    Object.defineProperty(event, "target", { value: chatButton })
     open(event)
   }
 }
-window.addEventListener("load", init)
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', init)
+} else {
+  init()
+}
 
 const containerElement = document.createElement("div")
-containerElement.id = WIDGET_CONTAINER_ID
+containerElement.id = "buildship-chat-widget__container"
 
 const messagesHistory = document.createElement("div")
-messagesHistory.id = WIDGET_MESSAGES_HISTORY_CONTAINER_ID
+messagesHistory.id = "buildship-chat-widget__messages_history"
 
 const optionalBackdrop = document.createElement("div")
-optionalBackdrop.id = WIDGET_BACKDROP_ID
+optionalBackdrop.id = "buildship-chat-widget__backdrop"
 
 const thinkingBubble = document.createElement("div")
-thinkingBubble.id = WIDGET_THINKING_BUBBLE_ID
+thinkingBubble.id = "buildship-chat-widget__thinking_bubble"
 thinkingBubble.innerHTML = `
     <span class="circle"></span>
     <span class="circle"></span>
@@ -106,14 +185,61 @@ function open(e: Event) {
     document.body.appendChild(containerElement)
   }
 
-  if (config.closeOnOutsideClick && !config.isPopover && !config.inPage) {
-    document.body.appendChild(optionalBackdrop)
-  }
-
   containerElement.innerHTML = widgetHTML
   containerElement.style.display = "block"
   containerElement.setAttribute("data-popover", config.isPopover.toString())
   containerElement.setAttribute("data-in-page", config.inPage.toString())
+
+  // Wait for elements to be mounted before attaching event listeners
+  requestAnimationFrame(() => {
+    // Handle backdrop click
+    if (config.closeOnOutsideClick && !config.isPopover && !config.inPage) {
+      document.body.appendChild(optionalBackdrop)
+      const backdrop = document.getElementById("buildship-chat-widget__backdrop")
+      if (backdrop) {
+        backdrop.addEventListener("click", close)
+      }
+    }
+
+    // Handle form submission
+    const form = containerElement.querySelector('#buildship-chat-widget__form')
+    if (form) {
+      form.addEventListener("submit", submit)
+    } else {
+      console.error("BuildShip Chat Widget: Form element not found")
+    }
+
+    // Handle microphone button if enabled
+    if (config.enableAudioInput) {
+      const micButton = containerElement.querySelector('#buildship-chat-widget__mic')
+      if (micButton) {
+        micButton.addEventListener('click', toggleRecording)
+      }
+    } else {
+      const micButton = containerElement.querySelector('#buildship-chat-widget__mic') as HTMLButtonElement
+      if (micButton) {
+        micButton.style.display = 'none'
+      }
+    }
+
+    // Handle title and messages
+    const chatbotHeaderTitleText = document.createElement("span")
+    chatbotHeaderTitleText.id = "buildship-chat-widget__title_text"
+    chatbotHeaderTitleText.textContent = config.widgetTitle
+    const chatbotHeaderTitle = containerElement.querySelector("#buildship-chat-widget__title")
+    if (chatbotHeaderTitle) {
+      chatbotHeaderTitle.appendChild(chatbotHeaderTitleText)
+    }
+
+    const chatbotBody = containerElement.querySelector("#buildship-chat-widget__body")
+    if (chatbotBody) {
+      chatbotBody.prepend(messagesHistory)
+    }
+
+    if (config.greetingMessage) {
+      createNewMessageEntry(config.greetingMessage, Date.now(), "system")
+    }
+  })
 
   if (config.isPopover && !config.inPage && targetElement) {
     const updatePosition = () => {
@@ -149,46 +275,32 @@ function open(e: Event) {
     })
   }
 
-  if (config.greetingMessage) {
-    createNewMessageEntry(config.greetingMessage, Date.now(), "system")
-  }
-
-  const chatbotHeaderTitleText = document.createElement("span")
-  chatbotHeaderTitleText.id = "buildship-chat-widget__title_text"
-  chatbotHeaderTitleText.textContent = config.widgetTitle
-  const chatbotHeaderTitle = document.getElementById(
-    "buildship-chat-widget__title"
-  )!
-  chatbotHeaderTitle.appendChild(chatbotHeaderTitleText)
-
-  const chatbotBody = document.getElementById("buildship-chat-widget__body")!
-  chatbotBody.prepend(messagesHistory)
-
   trap.activate()
-  const messageInput = document.getElementById(
-    "buildship-chat-widget__input"
+  const messageInput = containerElement.querySelector(
+    "#buildship-chat-widget__input"
   ) as HTMLTextAreaElement
-
-  if (config.closeOnOutsideClick) {
-    document
-      .getElementById(WIDGET_BACKDROP_ID)!
-      .addEventListener("click", close)
+  if (messageInput) {
+    messageInput.focus()
   }
-
-  document
-    .getElementById("buildship-chat-widget__form")!
-    .addEventListener("submit", submit)
 }
 
 function close() {
+  cleanup()
   trap.deactivate()
+  
+  // Remove event listeners
+  const backdrop = document.getElementById("buildship-chat-widget__backdrop")
+  if (backdrop) {
+    backdrop.removeEventListener("click", close)
+    backdrop.remove()
+  }
 
-  containerElement.innerHTML = ""
+  const form = containerElement.querySelector('#buildship-chat-widget__form')
+  if (form) {
+    form.removeEventListener("submit", submit)
+  }
 
   containerElement.remove()
-  optionalBackdrop.remove()
-  cleanup()
-  cleanup = () => {}
 }
 
 async function createNewMessageEntry(
@@ -338,7 +450,10 @@ const handleStreamedResponse = async (res: Response) => {
 
 async function submit(e: Event) {
   e.preventDefault()
-  const target = e.target as HTMLFormElement
+  e.stopPropagation()
+  
+  const form = e.target as HTMLFormElement
+  const messageInput = form.elements.namedItem('message') as HTMLInputElement
 
   if (!config.url) {
     console.error("BuildShip Chat Widget: No URL provided")
@@ -347,23 +462,27 @@ async function submit(e: Event) {
     return
   }
 
-  const submitElement = document.getElementById(
+  const submitButton = document.getElementById(
     "buildship-chat-widget__submit"
-  )!
-  submitElement.setAttribute("disabled", "")
+  ) as HTMLButtonElement
+  submitButton.disabled = true
 
   const requestHeaders = new Headers()
   requestHeaders.append("Content-Type", "application/json")
 
+  // Extract appId from URL (e.g., 'rhod9r' from 'rhod9r.buildship.run')
+  const appId = new URL(config.url).hostname.split('.')[0]
+  requestHeaders.append("x-budibase-app-id", appId)
+
   const data = {
-    message: (target.elements as any).message.value,
+    message: messageInput.value,
     threadId: config.threadId,
     timestamp: Date.now(),
     ...config.user
   }
 
   await createNewMessageEntry(data.message, data.timestamp, "user")
-  target.reset()
+  form.reset()
   messagesHistory.prepend(thinkingBubble)
 
   try {
@@ -410,7 +529,7 @@ async function submit(e: Event) {
     }
   }
 
-  submitElement.removeAttribute("disabled")
+  submitButton.disabled = false
   return false
 }
 

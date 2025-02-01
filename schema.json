@@ -5,65 +5,77 @@
     "name": "ff-ai-chatbox",
     "friendlyName": "AI Chatbox",
     "description": "An AI-powered chat widget for Fastform",
-    "icon": "MessageCircle",
+    "icon": "MagicWand",
     "hasChildren": false,
     "showEmptyState": false,
     "settings": [
       {
-        "type": "text",
-        "key": "url",
-        "label": "Chat API URL",
-        "required": true
-      },
-      {
-        "type": "text",
-        "key": "widgetTitle",
-        "label": "Widget Title",
-        "defaultValue": "Chatbot"
-      },
-      {
-        "type": "text",
-        "key": "greetingMessage",
-        "label": "Greeting Message",
-        "defaultValue": "Hello! How can I help you today?"
-      },
-      {
-        "type": "boolean",
-        "key": "responseIsAStream",
-        "label": "Response is Streamed",
-        "defaultValue": false
-      },
-      {
-        "type": "boolean",
-        "key": "disableErrorAlert",
-        "label": "Disable Error Alerts",
-        "defaultValue": false
-      },
-      {
-        "type": "boolean",
-        "key": "closeOnOutsideClick",
-        "label": "Close on Outside Click",
-        "defaultValue": true
-      },
-      {
-        "type": "boolean",
-        "key": "openOnLoad",
-        "label": "Open on Page Load",
-        "defaultValue": false
-      },
-      {
-        "type": "boolean",
-        "key": "isPopover",
-        "label": "Show as Popover",
-        "defaultValue": true,
-        "description": "Show chat widget as a popover instead of modal"
-      },
-      {
-        "type": "boolean",
-        "key": "inPage",
-        "label": "In-Page Mode",
-        "defaultValue": false,
-        "description": "Expand widget within its container instead of showing as modal/popover"
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "BuildShip API URL"
+          },
+          "threadId": {
+            "type": ["string", "null"],
+            "description": "Thread ID for the chat"
+          },
+          "responseIsAStream": {
+            "type": "boolean",
+            "description": "Whether the response is streamed",
+            "default": false
+          },
+          "user": {
+            "type": "object",
+            "description": "User data to send with each message"
+          },
+          "widgetTitle": {
+            "type": "string",
+            "description": "Title of the chat widget",
+            "default": "Chat with AI"
+          },
+          "greetingMessage": {
+            "type": ["string", "null"],
+            "description": "Initial message to display",
+            "default": null
+          },
+          "disableErrorAlert": {
+            "type": "boolean",
+            "description": "Disable error alerts",
+            "default": false
+          },
+          "closeOnOutsideClick": {
+            "type": "boolean",
+            "description": "Close widget when clicking outside",
+            "default": true
+          },
+          "openOnLoad": {
+            "type": "boolean",
+            "description": "Open widget when page loads",
+            "default": false
+          },
+          "isPopover": {
+            "type": "boolean",
+            "description": "Show widget as a popover next to trigger button",
+            "default": false
+          },
+          "inPage": {
+            "type": "boolean",
+            "description": "Show widget in-page without backdrop",
+            "default": false
+          },
+          "enableAudioInput": {
+            "type": "boolean",
+            "description": "Enable voice input via microphone",
+            "default": true
+          },
+          "autoSendAudioMessage": {
+            "type": "boolean",
+            "description": "Automatically send message when voice recording stops",
+            "default": true
+          }
+        },
+        "required": ["url"]
       }
     ],
     "context": [

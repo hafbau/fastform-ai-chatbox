@@ -347,3 +347,37 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* Microphone button styles */
+#buildship-chat-widget__mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #666;
+  transition: color 0.2s ease;
+}
+
+#buildship-chat-widget__mic:hover {
+  color: #333;
+}
+
+#buildship-chat-widget__mic.recording {
+  color: #f44336;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}

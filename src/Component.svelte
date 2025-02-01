@@ -5,12 +5,16 @@
 
   // Props from schema.json settings
   export let url = ""
-  export let widgetTitle = "Chatbot"
+  export let widgetTitle = "Ask Neil"
   export let greetingMessage = "Hello! How can I help you today?"
   export let responseIsAStream = false
   export let disableErrorAlert = false
   export let closeOnOutsideClick = true
   export let openOnLoad = false
+  export let isPopover = false
+  export let inPage = false
+  export let enableAudioInput = true
+  export let autoSendAudioMessage = true
 
   // Get SDK context
   const { styleable, Provider } = getContext("sdk")
@@ -30,10 +34,19 @@
     chatWidget.config.disableErrorAlert = disableErrorAlert
     chatWidget.config.closeOnOutsideClick = closeOnOutsideClick
     chatWidget.config.openOnLoad = openOnLoad
+    chatWidget.config.isPopover = isPopover
+    chatWidget.config.inPage = inPage
+    chatWidget.config.enableAudioInput = enableAudioInput
+    chatWidget.config.autoSendAudioMessage = autoSendAudioMessage
 
     // Initialize the widget
     await chatWidget.init()
     isInitialized = true
+
+    // Open on load if configured
+    if (openOnLoad) {
+      chatWidget.open({ target: chatButton })
+    }
   })
 
   // Cleanup on component destroy
