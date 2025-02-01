@@ -26,6 +26,9 @@
 
   // Initialize chat widget
   onMount(async () => {
+    // Wait for button to be mounted
+    await new Promise(resolve => setTimeout(resolve, 0))
+
     // Configure the widget
     chatWidget.config.url = url
     chatWidget.config.widgetTitle = widgetTitle
@@ -44,7 +47,7 @@
     isInitialized = true
 
     // Open on load if configured
-    if (openOnLoad) {
+    if (openOnLoad && chatButton) {
       chatWidget.open({ target: chatButton })
     }
   })
@@ -57,9 +60,9 @@
   })
 
   // Handle button click
-  function handleClick() {
+  function handleClick(e) {
     if (isInitialized) {
-      chatWidget.open({ target: chatButton })
+      chatWidget.open({ target: e.currentTarget })
     }
   }
 </script>
@@ -71,7 +74,7 @@
     on:click={handleClick}
     class="chat-button"
   >
-    <slot>Chat with AI</slot>
+    <slot>Ask Neil</slot>
   </button>
 </div>
 
