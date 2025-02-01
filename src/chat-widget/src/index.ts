@@ -318,12 +318,17 @@ async function submit(e: Event) {
 
   const data = {
     ...config.user,
-    message: (target.elements as any).message.value,
+    messages: [
+      {
+        role: "user",
+        content: (target.elements as any).message.value,
+      },
+    ],
     threadId: config.threadId,
     timestamp: Date.now(),
   }
 
-  await createNewMessageEntry(data.message, data.timestamp, "user")
+  await createNewMessageEntry(data.messages[0].content, data.timestamp, "user")
   target.reset()
   messagesHistory.prepend(thinkingBubble)
 
