@@ -12,10 +12,11 @@
   },
   "dependencies": {
     "@crownframework/svelte-error-boundary": "^1.0.3",
-    "@floating-ui/dom": "^1.6.13",
+    "@floating-ui/dom": "^1.5.3",
+    "dompurify": "^3.0.6",
     "focus-trap": "^7.6.4",
     "html-minifier": "^4.0.0",
-    "marked": "^15.0.6",
+    "marked": "^11.1.1",
     "svelte": "^3.49.0",
     "tslib": "^2.8.1"
   },

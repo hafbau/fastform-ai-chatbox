@@ -1,4 +1,4 @@
-import { Widget } from '../components/Widget'
+import type { WidgetConfig } from '../types/config'
 
 // Define WebkitSpeechRecognition types
 interface SpeechRecognitionResult {
@@ -42,32 +42,40 @@ declare global {
   }
 }
 
-export class SpeechService {
-  private recognition: IWebkitSpeechRecognition | null = null;
-  private widget: Widget;
-  private onResult: (text: string) => void;
-  private isRecording: boolean = false;
+interface SpeechServiceCallbacks {
+  config: WidgetConfig
+  onMicClick: ((event: Event) => void) | null
+  onResult: (text: string) => void
+  setRecording: (isRecording: boolean) => void
+}
 
-  constructor(widget: Widget, onResult: (text: string) => void) {
-    this.widget = widget;
-    this.onResult = onResult;
-    this.initializeSpeechRecognition();
+export class SpeechService {
+  private config: WidgetConfig
+  private recognition: any
+  private isRecording: boolean = false
+  private callbacks: SpeechServiceCallbacks
+
+  constructor(callbacks: SpeechServiceCallbacks) {
+    this.callbacks = callbacks
+    this.config = callbacks.config
+    this.initSpeechRecognition()
   }
 
-  private initializeSpeechRecognition(): void {
-    if ('webkitSpeechRecognition' in window) {
-      this.recognition = new window.webkitSpeechRecognition();
-      this.recognition.continuous = false;
-      this.recognition.interimResults = true;
+  private initSpeechRecognition(): void {
+    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
+      const WebkitSpeechRecognition = (window as any).webkitSpeechRecognition
+      this.recognition = new WebkitSpeechRecognition()
+      this.recognition.continuous = false
+      this.recognition.interimResults = true
 
       this.recognition.onstart = () => {
-        this.isRecording = true;
-        this.widget.setMicRecording(true);
+        this.isRecording = true
+        this.callbacks.setRecording(true)
       };
 
       this.recognition.onend = () => {
-        this.isRecording = false;
-        this.widget.setMicRecording(false);
+        this.isRecording = false
+        this.callbacks.setRecording(false)
       };
 
       this.recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -86,32 +94,56 @@ export class SpeechService {
         }
 
         if (finalTranscript) {
-          this.onResult(finalTranscript);
+          this.callbacks.onResult(finalTranscript);
         }
       };
 
-      this.recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event);
-        this.isRecording = false;
-        this.widget.setMicRecording(false);
+      this.recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error)
+        this.stopRecording()
       };
+    }
+  }
+
+  public isSupported(): boolean {
+    return typeof window !== 'undefined' && 'webkitSpeechRecognition' in window
+  }
+
+  public startRecording(): void {
+    if (!this.isRecording && this.recognition) {
+      this.isRecording = true
+      this.callbacks.setRecording(true)
+      this.recognition.start()
+    }
+  }
+
+  public stopRecording(): void {
+    if (this.isRecording && this.recognition) {
+      this.isRecording = false
+      this.callbacks.setRecording(false)
+      this.recognition.stop()
     }
   }
 
   public toggleRecording(): void {
     if (!this.recognition) {
-      console.warn('Speech recognition is not supported in this browser');
-      return;
+      console.warn('Speech recognition is not supported in this browser')
+      return
     }
 
     if (this.isRecording) {
-      this.recognition.stop();
+      this.recognition.stop()
     } else {
-      this.recognition.start();
+      this.recognition.start()
     }
   }
 
-  public isSupported(): boolean {
-    return 'webkitSpeechRecognition' in window;
+  public cleanup(): void {
+    this.stopRecording()
+    if (this.recognition) {
+      this.recognition.onresult = null
+      this.recognition.onerror = null
+      this.recognition.onend = null
+    }
   }
 }

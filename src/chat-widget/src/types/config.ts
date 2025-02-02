@@ -12,10 +12,7 @@ export interface WidgetConfig {
   // Widget mode specific options
   buttonPosition?: ButtonPosition
   widgetPosition?: WidgetPosition
-  buttonFixed?: boolean
-  widgetFixed?: boolean
   openOnLoad?: boolean
-  showBackdrop?: boolean
   
   // Custom positioning (when position is 'custom')
   buttonStyle?: {

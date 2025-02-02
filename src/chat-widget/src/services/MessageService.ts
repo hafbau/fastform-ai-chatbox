@@ -1,86 +1,80 @@
-import { WidgetConfig } from '../types/config'
-import { Message, MessageRole } from '../types/messages'
+import type { WidgetConfig } from '../types/config'
+import type { Message } from '../types/messages'
+import { MessageRoles } from '../types/messages'
 import { APIService } from './APIService'
-import { Widget } from '../components/Widget'
+
+interface MessageServiceCallbacks {
+  config: WidgetConfig
+  onSubmit: ((message: string) => void) | null
+  onClose: (() => void) | null
+  appendMessage: (message: Message) => void
+  setProcessing: (isProcessing: boolean) => void
+  showTypingIndicator: () => void
+  hideTypingIndicator: () => void
+}
 
 export class MessageService {
   private config: WidgetConfig
-  private widget: Widget
   private apiService: APIService
-  private messages: Message[] = []
+  private callbacks: MessageServiceCallbacks
 
-  constructor(config: WidgetConfig, widget: Widget) {
-    this.config = config
-    this.widget = widget
-    this.apiService = new APIService(config)
+  constructor(callbacks: MessageServiceCallbacks) {
+    this.callbacks = callbacks
+    this.config = callbacks.config
+    this.apiService = new APIService(callbacks.config)
   }
 
-  public async sendMessage(content: string): Promise<void> {
-    // Don't send empty messages
-    if (!content.trim()) return
+  public async handleSubmit(message: string): Promise<void> {
+    if (this.callbacks.onSubmit) {
+      this.callbacks.onSubmit(message)
+    }
 
-    try {
-      // Add user message
-      this.addMessage('user', content)
+    if (this.config.url) {
+      try {
+        this.callbacks.setProcessing(true)
+        this.callbacks.showTypingIndicator()
 
-      // Show processing state
-      this.widget.setProcessing(true)
-      this.widget.showTypingIndicator()
-
-      // Send to API
-      const response = await this.apiService.sendMessage(content)
-
-      // Handle response based on config
-      if (this.config.responseIsAStream) {
-        let accumulatedMessage = ''
-        await this.apiService.handleStreamResponse(response, (chunk) => {
-          accumulatedMessage += chunk
-          this.updateLastMessage(accumulatedMessage)
-        })
-      } else {
-        const content = await this.apiService.handleRegularResponse(response)
-        this.addMessage('assistant', content)
+        const response = await this.apiService.sendMessage(message)
+        
+        if (response.ok) {
+          const data = await response.json()
+          this.callbacks.appendMessage({
+            role: MessageRoles.ASSISTANT,
+            content: data.message,
+            timestamp: Date.now(),
+            id: Math.random().toString(36).substr(2, 9)
+          })
+        } else {
+          console.error('Failed to send message:', response.statusText)
+          if (!this.config.disableErrorAlert) {
+            this.callbacks.appendMessage({
+              role: MessageRoles.SYSTEM,
+              content: 'Failed to send message. Please try again.',
+              timestamp: Date.now(),
+              id: Math.random().toString(36).substr(2, 9)
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error sending message:', error)
+        if (!this.config.disableErrorAlert) {
+          this.callbacks.appendMessage({
+            role: MessageRoles.SYSTEM,
+            content: 'An error occurred. Please try again.',
+            timestamp: Date.now(),
+            id: Math.random().toString(36).substr(2, 9)
+          })
+        }
+      } finally {
+        this.callbacks.hideTypingIndicator()
+        this.callbacks.setProcessing(false)
       }
-    } catch (error) {
-      console.error('Error sending message:', error)
-      if (!this.config.disableErrorAlert) {
-        this.addMessage('assistant', 'Sorry, there was an error processing your request. Please try again.')
-      }
-    } finally {
-      this.widget.hideTypingIndicator()
-      this.widget.setProcessing(false)
     }
   }
 
-  private addMessage(role: MessageRole, content: string): void {
-    const message: Message = {
-      role,
-      content,
-      timestamp: Date.now(),
-      id: Math.random().toString(36).substr(2, 9)
+  public handleClose(): void {
+    if (this.callbacks.onClose) {
+      this.callbacks.onClose()
     }
-    
-    this.messages.push(message)
-    this.widget.appendMessage(message)
-  }
-
-  private updateLastMessage(content: string): void {
-    const lastMessage = this.messages[this.messages.length - 1]
-    if (lastMessage && lastMessage.role === 'assistant') {
-      lastMessage.content = content
-      // Re-render the message
-      this.widget.appendMessage(lastMessage)
-    } else {
-      this.addMessage('assistant', content)
-    }
-  }
-
-  public getMessages(): Message[] {
-    return [...this.messages]
-  }
-
-  public clearMessages(): void {
-    this.messages = []
-    this.widget.clear()
   }
 }
