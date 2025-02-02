@@ -1,5 +1,5 @@
 import { WidgetConfig } from '../types/config'
-import { Message, MessageResponse } from '../types/messages'
+import { MessageResponse } from '../types/messages'
 
 export class APIService {
   private config: WidgetConfig

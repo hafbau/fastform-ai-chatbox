@@ -1,14 +1,27 @@
 <script>
-  import Header from './Header.svelte'
+  import { createEventDispatcher, onMount } from 'svelte'
   import MessageList from './MessageList.svelte'
   import Input from './Input.svelte'
-  import { createEventDispatcher } from 'svelte'
+  import Header from './Header.svelte'
 
   export let title = 'Chat'
   export let messages = []
   export let isRecording = false
 
   const dispatch = createEventDispatcher()
+  let inputComponent
+  let lastFocusedElement
+
+  onMount(() => {
+    lastFocusedElement = document.activeElement
+    inputComponent?.focus()
+
+    return () => {
+      if (lastFocusedElement) {
+        lastFocusedElement.focus()
+      }
+    }
+  })
 
   function handleClose() {
     dispatch('close')
@@ -25,14 +38,26 @@
   function handleStopRecording() {
     dispatch('stopRecording')
   }
+
+  function handleKeydown(event) {
+    if (event.key === 'Escape') {
+      dispatch('close')
+    }
+  }
 </script>
 
-<div class="chat-widget">
+<div 
+  class="chat-widget"
+  on:keydown={handleKeydown}
+  role="dialog"
+  aria-label={title}
+>
   <Header {title} onClose={handleClose} />
   
   <MessageList {messages} />
   
   <Input
+    bind:this={inputComponent}
     {isRecording}
     on:submit={handleSubmit}
     on:startRecording={handleStartRecording}

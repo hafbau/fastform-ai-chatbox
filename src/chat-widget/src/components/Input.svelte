@@ -1,231 +1,146 @@
 <script>
-  import { onMount } from 'svelte'
   import { createEventDispatcher } from 'svelte'
+  import SpeechRecorder from './SpeechRecorder.svelte'
 
   export let placeholder = 'Type a message...'
   export let maxHeight = 150
-  export let isRecording = false
+  export let minHeight = 54
+  export let isProcessing = false
+  export let language = 'en-US'
+  export let onSubmit = (message) => {}
+  export let disabled = false
 
   const dispatch = createEventDispatcher()
   let textarea
-  let recording = false
-  let waveformAnimation
+  let input = ''
 
   function autoGrow() {
     if (!textarea) return
     textarea.style.height = 'auto'
-    const newHeight = Math.min(textarea.scrollHeight, maxHeight)
-    textarea.style.height = newHeight + 'px'
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)
+    textarea.style.height = `${newHeight}px`
   }
 
-  function handleKeydown(event) {
-    if (event.key === 'Enter' && !event.shiftKey) {
+  function handleKeyDown(event) {
+    if (event.key === 'Enter' && !event.shiftKey && input.trim()) {
       event.preventDefault()
-      handleSubmit()
+      onSubmit(input.trim())
+      input = ''
     }
   }
 
   function handleSubmit() {
-    if (!textarea.value.trim()) return
-    dispatch('submit', textarea.value)
-    textarea.value = ''
-    autoGrow()
-  }
-
-  function toggleRecording() {
-    recording = !recording
-    if (recording) {
-      startWaveform()
-      dispatch('startRecording')
-    } else {
-      stopWaveform()
-      dispatch('stopRecording')
+    if (input.trim()) {
+      onSubmit(input.trim())
+      input = ''
     }
   }
 
-  function startWaveform() {
-    const canvas = document.getElementById('waveform')
-    const ctx = canvas.getContext('2d')
-    const width = canvas.width
-    const height = canvas.height
-    let x = 0
-
-    waveformAnimation = requestAnimationFrame(function draw() {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)'
-      ctx.fillRect(0, 0, width, height)
-      
-      // Draw waveform
-      ctx.beginPath()
-      ctx.moveTo(x, height / 2)
-      
-      for (let i = 0; i < width; i++) {
-        const y = height / 2 + Math.sin(i * 0.05 + x * 0.1) * 20 * Math.random()
-        ctx.lineTo(i, y)
-      }
-      
-      ctx.strokeStyle = '#0066FF'
-      ctx.lineWidth = 2
-      ctx.stroke()
-      
-      x += 2
-      if (recording) {
-        waveformAnimation = requestAnimationFrame(draw)
-      }
-    })
-  }
-
-  function stopWaveform() {
-    if (waveformAnimation) {
-      cancelAnimationFrame(waveformAnimation)
+  function handleSpeechResult(event) {
+    const { transcript, isFinal } = event.detail
+    if (isFinal) {
+      input = transcript
+      handleSubmit()
     }
-    const canvas = document.getElementById('waveform')
-    const ctx = canvas.getContext('2d')
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
   }
 
-  onMount(() => {
-    autoGrow()
-  })
+  function handleSpeechError(event) {
+    dispatch('error', event.detail)
+  }
+
+  export function focus() {
+    textarea?.focus()
+  }
 </script>
 
-<div class="input-container">
+<div class="input-area">
   <div class="textarea-wrapper">
     <textarea
       bind:this={textarea}
+      bind:value={input}
       on:input={autoGrow}
-      on:keydown={handleKeydown}
+      on:keydown={handleKeyDown}
       {placeholder}
       rows="1"
-      maxlength="1000"
-    ></textarea>
+      disabled={isProcessing || disabled}
+    />
     
-    <button 
-      class="mic-button" 
-      class:recording 
-      on:click={toggleRecording}
-      aria-label={recording ? 'Stop recording' : 'Start recording'}
-    >
-      <div class="mic-icon">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-        </svg>
-      </div>
-      {#if recording}
-        <canvas id="waveform" width="120" height="40"></canvas>
-      {/if}
-    </button>
+    <SpeechRecorder
+      {language}
+      on:result={handleSpeechResult}
+      on:error={handleSpeechError}
+    />
   </div>
   
   <button 
-    class="send-button"
+    class="send-button" 
     on:click={handleSubmit}
-    aria-label="Send message"
+    disabled={isProcessing || !input.trim() || disabled}
   >
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
     </svg>
   </button>
 </div>
 
 <style>
-  .input-container {
-    padding: 12px;
-    background: var(--buildship-chat-widget-input-bg, #ffffff);
-    border-top: 1px solid var(--buildship-chat-widget-border-color, rgba(0, 0, 0, 0.1));
+  .input-area {
     display: flex;
     gap: 8px;
-    align-items: flex-end;
+    padding: 12px;
+    background: var(--buildship-chat-input-bg, #ffffff);
+    border-top: 1px solid var(--buildship-chat-border-color, #e5e7eb);
   }
 
   .textarea-wrapper {
+    position: relative;
     flex: 1;
     display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    background: var(--buildship-chat-widget-textarea-bg, #f0f2f5);
-    border-radius: 20px;
-    padding: 8px 16px;
   }
 
   textarea {
     flex: 1;
-    border: none;
-    background: transparent;
-    resize: none;
-    padding: 0;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--buildship-chat-border-color, #e5e7eb);
+    border-radius: 20px;
+    background: var(--buildship-chat-textarea-bg, #f9fafb);
+    color: var(--buildship-chat-text-color, #1f2937);
     font-size: 14px;
     line-height: 1.5;
-    max-height: var(--buildship-chat-widget-input-max-height, 150px);
-    color: var(--buildship-chat-widget-input-text, #1c1c1c);
+    resize: none;
+    overflow-y: auto;
   }
 
   textarea:focus {
     outline: none;
-  }
-
-  .mic-button {
-    background: transparent;
-    border: none;
-    padding: 6px;
-    cursor: pointer;
-    border-radius: 50%;
-    color: var(--buildship-chat-widget-mic-color, #6b7280);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .mic-button:hover {
-    color: var(--buildship-chat-widget-mic-hover, #0066FF);
-  }
-
-  .mic-button.recording {
-    color: var(--buildship-chat-widget-mic-active, #0066FF);
-    background: var(--buildship-chat-widget-mic-active-bg, rgba(0, 102, 255, 0.1));
+    border-color: var(--buildship-chat-primary-color, #2563eb);
+    box-shadow: 0 0 0 2px var(--buildship-chat-primary-color-alpha, rgba(37, 99, 235, 0.1));
   }
 
   .send-button {
-    background: var(--buildship-chat-widget-send-bg, #0066FF);
-    border: none;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    border-radius: 20px;
+    background: var(--buildship-chat-button-bg, #f3f4f6);
+    color: var(--buildship-chat-button-color, #6b7280);
     cursor: pointer;
-    color: white;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s;
   }
 
   .send-button:hover {
-    transform: scale(1.05);
+    background: var(--buildship-chat-button-hover-bg, #e5e7eb);
+    color: var(--buildship-chat-button-hover-color, #4b5563);
   }
 
-  .send-button:active {
-    transform: scale(0.95);
-  }
-
-  canvas {
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  @keyframes pulse {
-    0% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.1);
-    }
-    100% {
-      transform: scale(1);
-    }
-  }
-
-  .recording .mic-icon {
-    animation: pulse 1.5s infinite;
+  .send-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>
