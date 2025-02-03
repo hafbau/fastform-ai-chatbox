@@ -22,6 +22,10 @@
     }, 0)
   }
 
+  $: if (isLoading) {
+    console.log('MessageList isLoading', isLoading)
+  }
+
   function scrollToBottom() {
     if (messageContainer) {
       messageContainer.scrollTop = messageContainer.scrollHeight

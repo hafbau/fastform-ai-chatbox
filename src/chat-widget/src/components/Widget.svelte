@@ -129,7 +129,7 @@
 <AudioMode
   visible={isAudioMode}
   {isProcessing}
-  {aiResponse}
+  aiResponse={isAudioMode ? aiResponse : ''}
   language={config.language}
   on:close={() => {
     isAudioMode = false
@@ -141,7 +141,7 @@
   on:speakingComplete={handleSpeakingComplete}
   on:interrupted={handleInterruption}
 />
-<MessageList {messages} {isAudioMode} isTyping={showTypingIndicator}/>
+<MessageList {messages} {isAudioMode} isLoading={isProcessing || showTypingIndicator}/>
 <Input
   bind:this={inputComponent}
   {isProcessing}
