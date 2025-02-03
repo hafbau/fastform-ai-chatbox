@@ -29,6 +29,11 @@
         "defaultValue": "Hello! How can I help you today?"
       },
       {
+        "type": "text",
+        "key": "appendContext",
+        "label": "Append Context"
+      },
+      {
         "type": "select",
         "key": "mode",
         "label": "Display Mode",

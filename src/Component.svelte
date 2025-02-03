@@ -5,6 +5,7 @@
   export let url = ''
   export let title = 'AI Chat'
   export let greetingMessage = ''
+  export let appendContext = ''
   export let responseIsAStream = false
   export let disableErrorAlert = false
   export let mode = 'widget'
@@ -17,6 +18,7 @@
     url,
     title,
     greetingMessage,
+    appendContext,
     responseIsAStream,
     disableErrorAlert,
     mode,

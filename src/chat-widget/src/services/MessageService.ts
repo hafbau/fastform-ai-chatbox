@@ -35,7 +35,9 @@ export class MessageService {
         this.callbacks.setProcessing(true)
         this.callbacks.showTypingIndicator()
 
-        const response = await this.apiService.sendMessage(message)
+        const response = await this.apiService.sendMessage(`User Included context: ${this.callbacks.config?.appendContext}
+          ///
+          User message: ${message}`)
         
         if (response.ok) {
           const data = await response.json()

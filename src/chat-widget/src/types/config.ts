@@ -7,6 +7,7 @@ export interface WidgetConfig {
   threadId?: string | null
   user?: string | null
   title?: string
+  appendContext?: string
   mode?: DisplayMode
   
   // Widget mode specific options
