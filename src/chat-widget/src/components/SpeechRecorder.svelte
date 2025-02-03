@@ -4,7 +4,7 @@
   import { SpeechToTextService } from '../services/SpeechToTextService'
 
   export let language = 'en-US'
-
+  export let updateRecordingStatus = () => {}
   const dispatch = createEventDispatcher()
   let speechService
   let isRecording = false
@@ -25,6 +25,7 @@
   onDestroy(() => {
     if (isRecording && speechService) {
       speechService.stop()
+      updateRecordingStatus(false)
     }
   })
 
@@ -33,16 +34,19 @@
 
     if (!isRecording) {
       isRecording = true
+      updateRecordingStatus(true)
       speechService.start((result) => {
         if (result.isFinal) {
           dispatch('result', result)
           isRecording = false
           speechService.stop()
+          updateRecordingStatus(false)
         }
       })
     } else {
       isRecording = false
       speechService.stop()
+      updateRecordingStatus(false)
     }
   }
 </script>

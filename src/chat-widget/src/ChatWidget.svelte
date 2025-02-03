@@ -34,7 +34,9 @@
     config: mergedConfig,
     onSubmit,
     onClose,
-    appendMessage,
+    appendMessage: (message) => {
+      messages = [...messages, message]
+    },
     setProcessing: (value) => isProcessing = value,
     showTypingIndicator: () => showTyping = true,
     hideTypingIndicator: () => showTyping = false
@@ -46,7 +48,13 @@
 
   onMount(() => {
     if (config.openOnLoad) {
-      widgetComponent?.show()
+      isOpen = true
+    }
+  })
+
+  onDestroy(() => {
+    if (isRecording) {
+      speechService.stop()
     }
   })
 
@@ -59,23 +67,16 @@
       isLoading = true
 
       // Add user message
-      messages = [...messages, {
-        id: Date.now(),
+      const userMessage = {
+        id: Date.now().toString(),
         content: message,
         role: MessageRoles.USER,
         timestamp: new Date()
-      }]
+      }
+      messages = [...messages, userMessage]
 
-      // Get assistant response
-      const response = await messageService.handleSubmit(message)
-      
-      // Add assistant message
-      messages = [...messages, {
-        id: Date.now(),
-        content: response,
-        role: MessageRoles.ASSISTANT,
-        timestamp: new Date()
-      }]
+      // Process message
+      await messageService.handleSubmit(message)
     } catch (err) {
       error = err.message || 'Failed to send message'
       console.error('Error sending message:', err)
@@ -85,10 +86,18 @@
   }
 
   function handleStartRecording() {
+    if (!speechService) return
+
     try {
       error = null
       isRecording = true
-      speechService.startRecording()
+      speechService.start((result) => {
+        if (result.isFinal) {
+          handleMessageSubmit({ detail: result.transcript })
+          isRecording = false
+          speechService.stop()
+        }
+      })
     } catch (err) {
       error = err.message || 'Failed to start recording'
       console.error('Error starting recording:', err)
@@ -97,99 +106,82 @@
   }
 
   function handleStopRecording() {
+    if (!speechService) return
+
     try {
       isRecording = false
-      speechService.stopRecording()
+      speechService.stop()
     } catch (err) {
       error = err.message || 'Failed to stop recording'
       console.error('Error stopping recording:', err)
     }
   }
 
-  function handleSpeechResult(event) {
-    const { transcript } = event.detail
-    if (transcript) {
-      handleMessageSubmit({ detail: transcript })
-    }
-  }
-
-  function handleWidgetClose() {
+  function handleClose() {
     isOpen = false
-    widgetComponent?.stopPositioning()
-    if (onClose) onClose()
+    messageService.handleClose()
   }
-
-  function handleClick() {
-    if (mergedConfig.mode === 'widget') {
-      isOpen = !isOpen
-      if (isOpen) {
-        widgetComponent?.startPositioning()
-      } else {
-        widgetComponent?.stopPositioning()
-      }
-    }
-  }
-
-  function appendMessage(message) {
-    messages = [...messages, message]
-  }
-
-  onDestroy(() => {
-    buttonComponent?.cleanup()
-    speechService.destroy()
-  })
 </script>
 
 {#if mergedConfig.mode === 'fullscreen'}
   <div class="chat-widget--fullscreen">
     <Widget
       title={mergedConfig.title}
+      mode={mergedConfig.mode}
       {messages}
       {isRecording}
       {isProcessing}
       {showTyping}
       {isLoading}
       {error}
-      on:close={handleWidgetClose}
+      on:close={handleClose}
       on:submit={handleMessageSubmit}
       on:startRecording={handleStartRecording}
       on:stopRecording={handleStopRecording}
-      on:speechResult={handleSpeechResult}
     />
   </div>
 {:else}
   <div class="chat-widget-container">
-    <Button
-      bind:this={buttonComponent}
-      buttonPosition={mergedConfig.buttonPosition}
-      {isOpen}
-      on:click={handleClick}
-    >
-      AI Chat
-    </Button>
-
-    <Backdrop {isOpen} on:click={handleWidgetClose} />
-
-    <WidgetContainer
-      bind:this={widgetComponent}
-      {isOpen}
-      widgetPosition={mergedConfig.widgetPosition}
-      referenceElement={buttonComponent?.buttonContainer}
-    >
-      <Widget
-        title={mergedConfig.title}
-        {messages}
-        {isRecording}
-        {isProcessing}
-        {showTyping}
-        {isLoading}
-        {error}
-        on:close={handleWidgetClose}
-        on:submit={handleMessageSubmit}
-        on:startRecording={handleStartRecording}
-        on:stopRecording={handleStopRecording}
-        on:speechResult={handleSpeechResult}
+    {#if !isOpen}
+      <Button
+        bind:this={buttonComponent}
+        onClick={() => isOpen = true}
+        disabled={isProcessing}
       />
-    </WidgetContainer>
+    {/if}
+
+    {#if isOpen}
+      <Backdrop onClick={handleClose} />
+      <WidgetContainer
+        bind:this={widgetComponent}
+        {isOpen}
+        widgetPosition={mergedConfig.widgetPosition}
+        referenceElement={buttonComponent?.buttonContainer}
+      >
+        <Widget
+          title={mergedConfig.title}
+          mode={mergedConfig.mode}
+          {messages}
+          {isRecording}
+          {isProcessing}
+          {showTyping}
+          {isLoading}
+          {error}
+          on:close={handleClose}
+          on:submit={handleMessageSubmit}
+          on:startRecording={handleStartRecording}
+          on:stopRecording={handleStopRecording}
+        />
+      </WidgetContainer>
+    {/if}
   </div>
 {/if}
+
+<style>
+  .chat-widget-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+  }
+</style>

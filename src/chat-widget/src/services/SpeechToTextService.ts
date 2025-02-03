@@ -8,7 +8,7 @@ const DEFAULT_CONFIG: Required<SpeechConfig> = {
 }
 
 export class SpeechToTextService {
-  private recognition: SpeechRecognition | null = null
+  private recognition: any = null
   private config: Required<SpeechConfig>
   private onResult: ((result: SpeechResult) => void) | null = null
 
@@ -19,52 +19,71 @@ export class SpeechToTextService {
 
   private initializeSpeechRecognition() {
     if (!('webkitSpeechRecognition' in window)) {
-      console.error('Speech recognition is not supported in this browser.')
-      return
+      throw new Error('Speech recognition is not supported in this browser.')
     }
 
     try {
       this.recognition = new (window as any).webkitSpeechRecognition()
-      if (this.recognition) {
-        this.recognition.continuous = this.config.continuous
-        this.recognition.interimResults = this.config.interimResults
-        this.recognition.maxAlternatives = this.config.maxAlternatives
-        this.recognition.lang = this.config.language
-        this.setupEventListeners()
-      }
+      this.recognition.continuous = this.config.continuous
+      this.recognition.interimResults = this.config.interimResults
+      this.recognition.maxAlternatives = this.config.maxAlternatives
+      this.recognition.lang = this.config.language
+
+      this.setupEventListeners()
     } catch (error) {
       console.error('Failed to initialize speech recognition:', error)
+      throw error
     }
   }
 
   private setupEventListeners() {
     if (!this.recognition) return
 
-    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const result = event.results[i]
-        const transcript = result[0].transcript
-        if (this.onResult) {
-          this.onResult({
-            transcript,
-            confidence: result[0].confidence,
-            isFinal: result.isFinal
-          })
-        }
+    this.recognition.onresult = (event: any) => {
+      const result = event.results[event.results.length - 1]
+      const transcript = result[0].transcript
+      
+      if (this.onResult) {
+        this.onResult({
+          transcript,
+          confidence: result[0].confidence,
+          isFinal: result.isFinal
+        })
       }
     }
 
-    this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    this.recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error)
+      this.stop()
+    }
+
+    this.recognition.onend = () => {
+      if (this.onResult) {
+        this.onResult({
+          transcript: '',
+          confidence: 0,
+          isFinal: true
+        })
+      }
     }
   }
 
   public start(onResult: (result: SpeechResult) => void) {
+    if (!this.recognition) {
+      throw new Error('Speech recognition not initialized')
+    }
+
     this.onResult = onResult
-    this.recognition?.start()
+    this.recognition.start()
   }
 
   public stop() {
-    this.recognition?.stop()
+    if (this.recognition) {
+      try {
+        this.recognition.stop()
+      } catch (error) {
+        console.error('Error stopping speech recognition:', error)
+      }
+    }
   }
 }

@@ -7,6 +7,7 @@
 
   export let message
   export let isUser = false
+  export let isAudioMode = false
 
   let ttsService
 
@@ -17,7 +18,7 @@
   })
 
   onMount(async () => {
-    if (!isUser) {
+    if (!isUser && isAudioMode) {
       ttsService = new TextToSpeechService()
       await ttsService.speak(message.content)
     }

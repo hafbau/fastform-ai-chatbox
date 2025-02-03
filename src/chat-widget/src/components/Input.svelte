@@ -1,13 +1,13 @@
 <script>
   import { createEventDispatcher } from 'svelte'
+  import { scale } from 'svelte/transition'
   import SpeechRecorder from './SpeechRecorder.svelte'
 
   export let placeholder = 'Type a message...'
   export let maxHeight = 150
   export let minHeight = 54
   export let isProcessing = false
-  export let language = 'en-US'
-  export let onSubmit = (message) => {}
+  export let openAudioMode = () => {}
   export let disabled = false
 
   const dispatch = createEventDispatcher()
@@ -24,14 +24,14 @@
   function handleKeyDown(event) {
     if (event.key === 'Enter' && !event.shiftKey && input.trim()) {
       event.preventDefault()
-      onSubmit(input.trim())
+      dispatch('submit', input.trim())
       input = ''
     }
   }
 
   function handleSubmit() {
     if (input.trim()) {
-      onSubmit(input.trim())
+      dispatch('submit', input.trim())
       input = ''
     }
   }
@@ -65,11 +65,20 @@
       disabled={isProcessing || disabled}
     />
     
-    <SpeechRecorder
-      {language}
-      on:result={handleSpeechResult}
-      on:error={handleSpeechError}
-    />
+    <button
+      class="speech-button"
+      on:click={openAudioMode}
+      disabled={isProcessing || disabled}
+      title={'Use audio mode'}
+    >
+      <div class="icon" transition:scale={{ duration: 200 }}>
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="22" />
+        </svg>
+      </div>
+    </button>
   </div>
   
   <button 

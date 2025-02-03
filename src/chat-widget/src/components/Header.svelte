@@ -1,19 +1,22 @@
 <script>
   export let title = 'Chat'
+  export let isCloseButtonVisible = true
   export let onClose = () => {}
 </script>
 
 <header class="chat-header">
   <h2 class="chat-title">{title}</h2>
-  <button 
-    class="close-button" 
-    on:click={onClose}
-    aria-label="Close chat"
-  >
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-    </svg>
-  </button>
+  {#if isCloseButtonVisible}
+    <button
+      class="close-button" 
+      on:click={onClose}
+      aria-label="Close chat"
+    >
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+      </svg>
+    </button>
+  {/if}
 </header>
 
 <style>

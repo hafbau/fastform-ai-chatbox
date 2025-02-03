@@ -5,6 +5,7 @@
   export let messages = []
   export let isLoading = false
   export let error = null
+  export let isAudioMode = false
   let messageContainer
   let lastMessageElement
   let messageElements = []
@@ -74,10 +75,12 @@
     <div
       bind:this={messageElements[i]}
       on:keydown={handleKeydown}
+      style="display: flex; flex-direction: column;"
     >
       <Message
         {message}
         isUser={message.role === 'user'}
+        isAudioMode={isAudioMode}
       />
     </div>
   {/each}
@@ -96,7 +99,7 @@
 <style>
   .message-list {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
     padding: 16px;
     scroll-behavior: smooth;
     display: flex;

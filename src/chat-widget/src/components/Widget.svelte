@@ -3,46 +3,81 @@
   import MessageList from './MessageList.svelte'
   import Input from './Input.svelte'
   import Header from './Header.svelte'
+  import AudioMode from './AudioMode.svelte'
 
   export let title = 'Chat'
   export let messages = []
   export let isRecording = false
+  export let isProcessing = false
+  export let showTyping = false
+  export let isLoading = false
+  export let error = null
+  export let mode = 'fullscreen'
 
   const dispatch = createEventDispatcher()
   let inputComponent
   let lastFocusedElement
+  let isAudioMode = false
+  let aiResponse = ''
 
   onMount(() => {
     lastFocusedElement = document.activeElement
-    inputComponent?.focus()
+    inputComponent?.focus?.()
 
     return () => {
       if (lastFocusedElement) {
-        lastFocusedElement.focus()
+        lastFocusedElement.focus?.()
       }
     }
   })
 
   function handleClose() {
+    if (isRecording) {
+      handleStopRecording()
+    }
+    if (mode === 'fullscreen') return
     dispatch('close')
   }
 
   function handleSubmit(event) {
-    dispatch('submit', event.detail)
+    const message = event.detail
+    dispatch('submit', { message })
   }
 
   function handleStartRecording() {
+    isRecording = true
     dispatch('startRecording')
   }
 
   function handleStopRecording() {
+    isRecording = false
     dispatch('stopRecording')
   }
 
   function handleKeydown(event) {
     if (event.key === 'Escape') {
-      dispatch('close')
+      handleClose()
     }
+  }
+
+  function openAudioMode() {
+    isAudioMode = true
+    dispatch('startRecording')
+  }
+
+  function handleAIResponse(event) {
+    aiResponse = event.detail.message
+  }
+
+  function handleSpeakingComplete() {
+    aiResponse = ''
+  }
+
+  function handleInterruption() {
+    // Clear the current AI response when user interrupts
+    aiResponse = ''
+    // Optionally notify parent that user interrupted AI
+    dispatch('interrupted')
   }
 </script>
 
@@ -52,17 +87,35 @@
   role="dialog"
   aria-label={title}
 >
-  <Header {title} onClose={handleClose} />
+  <Header {title} onClose={handleClose} isCloseButtonVisible={mode !== 'fullscreen'} />
   
-  <MessageList {messages} />
-  
-  <Input
-    bind:this={inputComponent}
-    {isRecording}
-    on:submit={handleSubmit}
-    on:startRecording={handleStartRecording}
-    on:stopRecording={handleStopRecording}
-  />
+  <div class="chat-widget__content">
+    <AudioMode 
+      visible={isAudioMode}
+      isProcessing={isProcessing}
+      aiResponse={aiResponse}
+      on:close={() => {
+        isAudioMode = false
+        handleStopRecording()
+      }}
+      on:submit={handleSubmit}
+      on:error
+      on:speakingComplete={handleSpeakingComplete}
+      on:interrupted={handleInterruption}
+    />
+    <MessageList {messages} {isAudioMode} />
+    
+    <Input
+      bind:this={inputComponent}
+      {isRecording}
+      {isProcessing}
+      disabled={isLoading}
+      openAudioMode={openAudioMode}
+      on:submit={handleSubmit}
+      on:startRecording={handleStartRecording}
+      on:stopRecording={handleStopRecording}
+    />
+  </div>
 </div>
 
 <style>
@@ -71,5 +124,13 @@
     flex-direction: column;
     flex: 1;
     background: var(--buildship-chat-widget-bg, #ffffff);
+  }
+
+  .chat-widget__content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
   }
 </style>
