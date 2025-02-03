@@ -7,7 +7,6 @@
   export let maxHeight = 150
   export let minHeight = 54
   export let isProcessing = false
-  export let openAudioMode = () => {}
   export let disabled = false
 
   const dispatch = createEventDispatcher()
@@ -67,7 +66,7 @@
     
     <button
       class="speech-button"
-      on:click={openAudioMode}
+      on:click={() => dispatch('openAudioMode')}
       disabled={isProcessing || disabled}
       title={'Use audio mode'}
     >

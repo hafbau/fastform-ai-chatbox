@@ -19,8 +19,9 @@
 
   onMount(async () => {
     if (!isUser && isAudioMode) {
-      ttsService = new TextToSpeechService()
-      await ttsService.speak(message.content)
+      console.log('Mounting message in audio mode: ', message);
+      // ttsService = new TextToSpeechService()
+      // await ttsService.speak(message.content)
     }
   })
 

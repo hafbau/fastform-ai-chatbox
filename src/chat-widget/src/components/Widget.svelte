@@ -1,28 +1,55 @@
 <script>
-  import { createEventDispatcher, onMount } from 'svelte'
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte'
   import MessageList from './MessageList.svelte'
   import Input from './Input.svelte'
   import Header from './Header.svelte'
   import AudioMode from './AudioMode.svelte'
+  import { MessageService } from '../services/MessageService'
+  import { MessageRoles } from '../types/messages'
+  import '../ui/styles/widget.css'
 
-  export let title = 'Chat'
-  export let messages = []
-  export let isRecording = false
-  export let isProcessing = false
-  export let showTyping = false
-  export let isLoading = false
-  export let error = null
-  export let mode = 'fullscreen'
+  export let config
 
   const dispatch = createEventDispatcher()
-  let inputComponent
-  let lastFocusedElement
+  let messages = []
+  let isProcessing = false
   let isAudioMode = false
   let aiResponse = ''
+  let error = null
+  let messageService
+  let lastFocusedElement
+  let inputComponent
+  let showTypingIndicator = false
 
   onMount(() => {
     lastFocusedElement = document.activeElement
     inputComponent?.focus?.()
+
+    messageService = new MessageService({
+      config,
+      onAIResponse: (response) => {
+        console.log('AI response is here!!!response', response)
+        if (typeof response === 'string') {
+          aiResponse = response
+          // Ensure we're in processing-ai state when response arrives
+          if (isAudioMode) {
+            isProcessing = true
+          }
+        }
+      },
+      appendMessage: (message) => {
+        messages = [...messages, message]
+      },
+      setProcessing: (value) => {
+        isProcessing = value
+      },
+      showTypingIndicator: () => {
+        showTypingIndicator = true
+      },
+      hideTypingIndicator: () => {
+        showTypingIndicator = false
+      },
+    })
 
     return () => {
       if (lastFocusedElement) {
@@ -31,106 +58,97 @@
     }
   })
 
-  function handleClose() {
-    if (isRecording) {
-      handleStopRecording()
+  // Message Management
+  async function handleSubmit(event) {
+    const message = event.detail?.message || event.detail
+    if (typeof message !== 'string') {
+      console.error('Widget: Invalid message type:', message)
+      return
     }
-    if (mode === 'fullscreen') return
-    dispatch('close')
-  }
 
-  function handleSubmit(event) {
-    const message = event.detail
-    dispatch('submit', { message })
-  }
+    try {
+      isProcessing = true
+      error = null
+      aiResponse = '' // Clear previous response
 
-  function handleStartRecording() {
-    isRecording = true
-    dispatch('startRecording')
-  }
+      // Add user message to list
+      messages = [...messages, {
+        id: Date.now().toString(),
+        content: message,
+        role: MessageRoles.USER,
+        timestamp: new Date()
+      }]
 
-  function handleStopRecording() {
-    isRecording = false
-    dispatch('stopRecording')
-  }
-
-  function handleKeydown(event) {
-    if (event.key === 'Escape') {
-      handleClose()
+      // Process message
+      await messageService.handleSubmit(message)
+    } catch (err) {
+      error = err.message || 'Failed to send message'
+      dispatch('error', error)
+      if (isAudioMode) {
+        isProcessing = false
+      }
     }
   }
 
-  function openAudioMode() {
-    isAudioMode = true
-    dispatch('startRecording')
-  }
-
-  function handleAIResponse(event) {
-    aiResponse = event.detail.message
-  }
-
+  // Audio Mode Management
   function handleSpeakingComplete() {
     aiResponse = ''
+    isProcessing = false
   }
 
   function handleInterruption() {
-    // Clear the current AI response when user interrupts
     aiResponse = ''
-    // Optionally notify parent that user interrupted AI
-    dispatch('interrupted')
+    isProcessing = false
+  }
+
+  // Error Handling
+  function handleError(event) {
+    error = event.detail
+    dispatch('error', error)
+  }
+
+  // Cleanup
+  onDestroy(() => {
+    messages = []
+    aiResponse = ''
+    isProcessing = false
+    error = null
+  })
+
+  $: if (aiResponse && isAudioMode) {
+    console.log('aiResponse updated in Widget:', aiResponse)
   }
 </script>
 
-<div 
-  class="chat-widget"
-  on:keydown={handleKeydown}
-  role="dialog"
-  aria-label={title}
->
-  <Header {title} onClose={handleClose} isCloseButtonVisible={mode !== 'fullscreen'} />
-  
-  <div class="chat-widget__content">
-    <AudioMode 
-      visible={isAudioMode}
-      isProcessing={isProcessing}
-      aiResponse={aiResponse}
-      on:close={() => {
-        isAudioMode = false
-        handleStopRecording()
-      }}
-      on:submit={handleSubmit}
-      on:error
-      on:speakingComplete={handleSpeakingComplete}
-      on:interrupted={handleInterruption}
-    />
-    <MessageList {messages} {isAudioMode} />
-    
-    <Input
-      bind:this={inputComponent}
-      {isRecording}
-      {isProcessing}
-      disabled={isLoading}
-      openAudioMode={openAudioMode}
-      on:submit={handleSubmit}
-      on:startRecording={handleStartRecording}
-      on:stopRecording={handleStopRecording}
-    />
-  </div>
-</div>
+<Header 
+  title={config.title}
+  onClose={() => dispatch('close')} 
+  isCloseButtonVisible={config.mode !== 'fullscreen'}
+/>
 
-<style>
-  .chat-widget {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    background: var(--buildship-chat-widget-bg, #ffffff);
-  }
-
-  .chat-widget__content {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
-  }
-</style>
+<AudioMode
+  visible={isAudioMode}
+  {isProcessing}
+  {aiResponse}
+  language={config.language}
+  on:close={() => {
+    isAudioMode = false
+    isProcessing = false
+    aiResponse = ''
+  }}
+  on:submit={handleSubmit}
+  on:error={handleError}
+  on:speakingComplete={handleSpeakingComplete}
+  on:interrupted={handleInterruption}
+/>
+<MessageList {messages} {isAudioMode} isTyping={showTypingIndicator}/>
+<Input
+  bind:this={inputComponent}
+  {isProcessing}
+  on:submit={handleSubmit}
+  on:openAudioMode={() => {
+    isAudioMode = true
+    error = null
+    aiResponse = ''
+  }}
+/>

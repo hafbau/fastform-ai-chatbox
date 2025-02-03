@@ -9,11 +9,12 @@
   export let isProcessing = false;
   export let aiResponse = ''; 
   
-  let status = "ready";
+  let status = "recording"; 
   let transcript = "";
   let speechService;
   let playbackProgress = 0;
-  let lastAiResponse = ''; // Track last response to avoid duplicate playback
+  let lastAiResponse = '';
+  let isStopped = false;
   const dispatch = createEventDispatcher();
 
   onMount(() => {
@@ -32,30 +33,41 @@
   });
 
   function handleSpeechState(state) {
+    console.log('Handling speech state', {state, status});
+    if (status !== 'speaking') status = 'speaking';
     if (state.error) {
       dispatch('error', state.error);
-      status = 'ready';
+      status = isStopped ? 'ready' : 'recording';
     } else {
       playbackProgress = state.progress;
-      if (!state.isPlaying && status === 'speaking' && !state.isPaused) {
-        status = 'ready';
+      if (!state.isPlaying && !state.isPaused) {
+        status = isStopped ? 'ready' : 'recording';
         dispatch('speakingComplete');
       }
     }
   }
 
-  function updateRecordingStatus(isRecording) {
+  function updateRecordingStatus(isRecording, stopped = false) {
+    console.log('Updating recording status', {isRecording, stopped, status});
+    isStopped = stopped;
+    
+    if (stopped) {
+      status = 'ready';
+      return;
+    }
+
     if (isRecording) {
-      // If AI is speaking, stop it gracefully
       if (status === 'speaking') {
         speechService.stop();
+        console.log('stopped speaking because interrupted');
         dispatch('interrupted');
       }
       status = 'recording';
-    } else {
+    } else if (status !== 'ready') {
       status = 'processing-speech';
       if (transcript) {
         setTimeout(() => {
+          console.log('started processing AI because speech is not empty');
           status = 'processing-ai';
         }, 1000);
       }
@@ -63,7 +75,7 @@
   }
 
   function handleClose() {
-    if (status === 'speaking' && speechService) {
+    if (status === 'speaking') {
       speechService.stop();
     }
     dispatch("close");
@@ -71,33 +83,61 @@
 
   function handleSpeechResult(event) {
     const { transcript: text, isFinal } = event.detail;
+    if (typeof text !== 'string') {
+      console.error('Invalid transcript type:', text);
+      return;
+    }
     transcript = text;
-    if (isFinal) {
+    if (isFinal && text.trim()) {
       dispatch('submit', text);
+      status = 'processing-ai';
     }
   }
 
   function handleSpeechError(event) {
-    dispatch('error', event.detail);
+    const error = event.detail?.error || event.detail;
+    dispatch('error', error);
+  }
+
+  $: if (status) {
+    console.log('Status in bound audio mode: ', status);
   }
 
   // Handle AI response playback
-  $: if (aiResponse && status === 'processing-ai' && aiResponse !== lastAiResponse) {
+  // $: if (aiResponse && typeof aiResponse === 'string' && status === 'processing-ai' && aiResponse !== lastAiResponse) {
+  $: if (aiResponse && typeof aiResponse === 'string') {
+    console.log('aiResponse in bound audio mode: ', {aiResponse, status});
     lastAiResponse = aiResponse;
     status = 'speaking';
-    speechService.speak(aiResponse).catch(error => {
+    speechService.speak(aiResponse.trim()).catch(error => {
+      console.error('Speech error:', error);
       dispatch('error', error);
       status = 'ready';
     });
+  }
+
+  $: if (isProcessing && status === 'processing-speech') {
+    status = 'processing-ai';
+  }
+
+  $: if (playbackProgress === 100 && status === 'speaking') {
+    console.log('Speaking completed, resetting status');
+    status = 'recording';
+    dispatch('speakingComplete');
+  }
+
+  $: if (!visible) {
+    status = 'ready';
+    lastAiResponse = '';
   }
 
   function getStatusContent() {
     switch (status) {
       case 'ready':
         return {
-          title: 'Ready to Listen',
+          title: 'Microphone Off',
           message: 'Click the microphone to start speaking',
-          icon: 'mic'
+          icon: 'mic-off'
         };
       case 'recording':
         return {
@@ -120,14 +160,14 @@
       case 'speaking':
         return {
           title: 'AI is Speaking',
-          message: transcript ? 'Speak anytime to interrupt' : `${Math.round(playbackProgress * 100)}% complete`,
+          message: transcript ? 'Speak anytime to interrupt' : `${Math.round(playbackProgress)}% complete`,
           icon: 'speaker'
         };
       default:
         return {
-          title: 'Ready to Listen',
+          title: 'Microphone Off',
           message: 'Click the microphone to start speaking',
-          icon: 'mic'
+          icon: 'mic-off'
         };
     }
   }
@@ -155,6 +195,7 @@
           class:recording={status === "recording"}
           class:processing={status === "processing-speech" || status === "processing-ai"}
           class:speaking={status === "speaking"}
+          class:ready={status === "ready"}
           transition:scale={{ duration: 200 }}
         >
           {#if getStatusContent().icon === 'processing'}
@@ -167,6 +208,13 @@
               <path d="M12 6L8 10H4v4h4l4 4V6z" />
               <path d="M17 8a5 5 0 0 1 0 8" />
               <path d="M19 6a7 7 0 0 1 0 12" />
+            </svg>
+          {:else if getStatusContent().icon === 'mic-off'}
+            <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.5" fill="none">
+              <line x1="1" y1="1" x2="23" y2="23" />
+              <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+              <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
+              <line x1="12" y1="19" x2="12" y2="22" />
             </svg>
           {:else}
             <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.5" fill="none">
@@ -311,6 +359,11 @@
     background: #10b981;
   }
 
+  .audio-mode__icon.ready {
+    background: var(--buildship-chat-button-bg, #f3f4f6);
+    color: var(--buildship-chat-button-color, #6b7280);
+  }
+
   .audio-mode__icon-pulse {
     position: absolute;
     top: 50%;
@@ -400,8 +453,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    width: 60px;
+    height: 60px;
     padding: 0;
     border: none;
     border-radius: 50%;

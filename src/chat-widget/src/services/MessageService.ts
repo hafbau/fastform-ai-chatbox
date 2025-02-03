@@ -5,8 +5,9 @@ import { APIService } from './APIService'
 
 interface MessageServiceCallbacks {
   config: WidgetConfig
-  onSubmit: ((message: string) => void) | null
-  onClose: (() => void) | null
+  onSubmit?: ((message: string) => void)
+  onClose?: (() => void)
+  onAIResponse?: ((response: string) => void)
   appendMessage: (message: Message) => void
   setProcessing: (isProcessing: boolean) => void
   showTypingIndicator: () => void
@@ -38,6 +39,7 @@ export class MessageService {
         
         if (response.ok) {
           const data = await response.json()
+          this.callbacks.onAIResponse?.(data.message)
           this.callbacks.appendMessage({
             role: MessageRoles.ASSISTANT,
             content: data.message,

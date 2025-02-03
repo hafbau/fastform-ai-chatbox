@@ -1,62 +1,122 @@
 <script>
-  import { createEventDispatcher, onMount, onDestroy } from 'svelte'
-  import { fade, scale } from 'svelte/transition'
-  import { SpeechToTextService } from '../services/SpeechToTextService'
+  import { createEventDispatcher, onMount, onDestroy } from "svelte";
+  import { fade, scale } from 'svelte/transition';
 
-  export let language = 'en-US'
-  export let updateRecordingStatus = () => {}
-  const dispatch = createEventDispatcher()
-  let speechService
-  let isRecording = false
-  let error = null
+  export let language = "en-US";
+  export let updateRecordingStatus;
 
-  onMount(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach(track => track.stop())
-      
-      speechService = new SpeechToTextService({ language })
-    } catch (err) {
-      error = 'Please allow microphone access to use speech recognition.'
-      dispatch('error', { message: error })
-    }
-  })
+  let isRecording = true; // Start recording by default
+  let recognition = null;
+  let transcript = "";
+  const dispatch = createEventDispatcher();
+
+  onMount(() => {
+    initializeSpeechRecognition();
+    startRecording(); // Start recording immediately when mounted
+  });
 
   onDestroy(() => {
-    if (isRecording && speechService) {
-      speechService.stop()
-      updateRecordingStatus(false)
+    stopRecognition();
+  });
+
+  function initializeSpeechRecognition() {
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+      dispatch("error", "Speech recognition is not supported in this browser.");
+      return;
     }
-  })
 
-  function handleClick() {
-    if (!speechService) return
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = language;
 
-    if (!isRecording) {
-      isRecording = true
-      updateRecordingStatus(true)
-      speechService.start((result) => {
-        if (result.isFinal) {
-          dispatch('result', result)
-          isRecording = false
-          speechService.stop()
-          updateRecordingStatus(false)
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
         }
-      })
-    } else {
-      isRecording = false
-      speechService.stop()
-      updateRecordingStatus(false)
+      }
+
+      const currentTranscript = finalTranscript || interimTranscript;
+      transcript = currentTranscript;
+      
+      dispatch("result", {
+        transcript: currentTranscript,
+        isFinal: !!finalTranscript
+      });
+    };
+
+    recognition.onerror = (event) => {
+      dispatch("error", event.error);
+    };
+
+    recognition.onend = () => {
+      if (isRecording) {
+        stopRecording();
+      }
+    };
+  }
+
+  function startRecognition() {
+    if (!recognition) return;
+    try {
+      recognition.start();
+    } catch (error) {
+      if (error.name === 'NotAllowedError') {
+        dispatch("error", "Microphone permission denied");
+      } else {
+        console.error('Speech recognition error:', error);
+        dispatch("error", error.message);
+      }
     }
+  }
+
+  function stopRecognition() {
+    if (!recognition) return;
+    try {
+      recognition.stop();
+    } catch (error) {
+      console.error('Error stopping recognition:', error);
+    }
+  }
+
+  function toggleRecording() {
+    if (!recognition) return;
+    
+    isRecording = !isRecording;
+    if (isRecording) {
+      startRecording();
+    } else {
+      stopRecording({stopped: true});
+    }
+  }
+
+  function startRecording() {
+    isRecording = true;
+    updateRecordingStatus(true, false);
+    startRecognition();
+  }
+
+  function stopRecording({stopped = false} = {}) {
+    isRecording = false;
+    updateRecordingStatus(false, stopped);
+    stopRecognition();
+    transcript = "";
   }
 </script>
 
 <button
   class="speech-button"
   class:recording={isRecording}
-  on:click={handleClick}
-  disabled={!!error}
-  title={error || 'Click to start recording'}
+  on:click={toggleRecording}
+  aria-label={isRecording ? "Stop recording" : "Start recording"}
 >
   <div class="icon" transition:scale={{ duration: 200 }}>
     {#if isRecording}
@@ -82,8 +142,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 60px;
+    height: 60px;
     padding: 0;
     border: none;
     border-radius: 20px;
